@@ -1,0 +1,15 @@
+services:
+  tasmota-openbk-mcp:
+    image: ghcr.io/paulomac1000/tasmota-openbk-mcp:latest
+    env_file: .env
+    network_mode: host
+    ports:
+      - "9100:9100"
+      - "9101:9101"
+      - "9102:9102"
+    volumes:
+      - tasmota-openbk-mcp-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  tasmota-openbk-mcp-data:
