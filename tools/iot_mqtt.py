@@ -7,7 +7,7 @@ Interact with IoT devices via MQTT broker.
 import json
 import os
 import time
-from typing import Any, Dict
+from typing import Dict
 
 __all__ = ["register_iot_mqtt_tools", "_get_mqtt_client", "_mqtt_publish"]
 

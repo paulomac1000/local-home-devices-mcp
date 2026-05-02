@@ -21,6 +21,11 @@ from typing import Any, Dict, Optional
 
 from fastmcp import FastMCP
 
+from tools.iot_control import register_iot_control_tools
+from tools.iot_devices import register_iot_device_tools
+from tools.iot_discovery import register_iot_discovery_tools
+from tools.iot_mqtt import register_iot_mqtt_tools
+
 # =============================================================================
 # HEALTH CHECK SERVER (port 9100)
 # =============================================================================
@@ -88,11 +93,6 @@ mcp = FastMCP("IoT-Observer")
 # =============================================================================
 # REGISTER ALL TOOLS
 # =============================================================================
-
-from tools.iot_devices import register_iot_device_tools
-from tools.iot_discovery import register_iot_discovery_tools
-from tools.iot_control import register_iot_control_tools
-from tools.iot_mqtt import register_iot_mqtt_tools
 
 register_iot_device_tools(mcp)
 register_iot_discovery_tools(mcp)
@@ -301,7 +301,7 @@ if __name__ == "__main__":
     print(f"[server] MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
     print(f"[server] Network Range: {START_IP} - {END_IP}")
     print(f"[server] Scan CIDR: {DEFAULT_NETWORK_RANGE}")
-    print(f"[server] Device Cache: /app/data/discovered_devices.json")
+    print("[server] Device Cache: /app/data/discovered_devices.json")
     print(f"[server] Registered tools: {tool_count}")
     print("[server] " + "-" * 50)
 
