@@ -1,0 +1,194 @@
+# Tasmota-OpenBK-MCP
+
+[![CI](https://github.com/paulomac1000/tasmota-openbk-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/paulomac1000/tasmota-openbk-mcp/actions/workflows/ci.yml)
+[![Docker](https://github.com/paulomac1000/tasmota-openbk-mcp/actions/workflows/publish.yml/badge.svg)](https://github.com/paulomac1000/tasmota-openbk-mcp/actions/workflows/publish.yml)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+MCP (Model Context Protocol) server for IoT device management. Enables AI assistants (Claude Desktop, LibreChat, Cline) to discover and control OpenBK (OpenBeken) and Tasmota devices on your local network.
+
+## Requirements
+
+- Python 3.11+ (for local use) or Docker
+- MQTT broker (e.g., Mosquitto) on your network
+- OpenBK or Tasmota devices on the same local network
+
+## Quick Start
+
+### 1. Configure
+
+```bash
+cp .env.example .env
+# Edit .env with your MQTT_BROKER and network range
+```
+
+### 2. Run with Docker
+
+**Option A -- Pre-built image from GitHub Container Registry:**
+
+```bash
+docker run -d \
+  --name tasmota-openbk-mcp \
+  --network host \
+  -e MQTT_BROKER=192.168.0.101 \
+  -e START_IP=192.168.0.1 \
+  -e END_IP=192.168.0.254 \
+  -v tasmota-data:/app/data \
+  ghcr.io/paulomac1000/tasmota-openbk-mcp:latest
+```
+
+**Option B -- with docker compose:**
+
+```bash
+cp .env.example .env
+# edit .env with your settings
+docker compose up -d
+```
+
+**Option C -- Build locally:**
+
+```bash
+docker build -t tasmota-openbk-mcp .
+docker run -d \
+  --network host \
+  -e MQTT_BROKER=192.168.0.101 \
+  -e START_IP=192.168.0.1 \
+  -e END_IP=192.168.0.254 \
+  -v tasmota-data:/app/data \
+  tasmota-openbk-mcp
+```
+
+### 3. Run locally (Python 3.11+)
+
+```bash
+pip install -r requirements.txt
+MQTT_BROKER=192.168.0.101 START_IP=192.168.0.1 END_IP=192.168.0.254 python server.py
+```
+
+## Architecture
+
+| Port | Protocol | Purpose | Endpoint |
+|------|----------|---------|----------|
+| 9100 | HTTP | Health check | `GET /health` |
+| 9101 | SSE | MCP transport | `/sse`, `/messages` |
+| 9102 | HTTP | REST API | `/api/*` |
+
+### Verify
+
+```bash
+# Health check
+curl http://localhost:9100/health
+
+# List all MCP tools
+curl http://localhost:9102/api/tools
+
+# Call a tool via REST API
+curl -X POST http://localhost:9102/api/tools/iot_list_devices \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+## Available Tools
+
+### Device Discovery
+
+| Tool | Description |
+|------|-------------|
+| `iot_discover_devices` | Scan local network for OpenBK and Tasmota devices |
+| `iot_list_devices` | List all previously discovered devices from cache |
+| `iot_check_device` | Quick connectivity and status check for a specific IP |
+| `iot_find_device_by_name` | Find a device by its friendly name |
+
+### Device Information
+
+| Tool | Description |
+|------|-------------|
+| `iot_get_device_info` | Full device information (name, firmware, chip type, etc.) |
+| `iot_get_device_power` | Current power state of a specific channel |
+| `iot_get_wifi_config` | WiFi SSID, RSSI signal strength, MAC, IP address |
+
+### Device Control
+
+| Tool | Description |
+|------|-------------|
+| `iot_set_power` | Turn a channel ON, OFF, or TOGGLE |
+| `iot_set_brightness` | Set brightness level (0-100%) |
+| `iot_restart_device` | Restart the device |
+
+### MQTT Integration
+
+| Tool | Description |
+|------|-------------|
+| `iot_mqtt_publish` | Publish a command via MQTT |
+| `iot_mqtt_get_state` | Get device state from MQTT broker |
+| `iot_mqtt_build_command_topic` | Build MQTT command topic for a device |
+
+## Configuration
+
+All configuration is via environment variables. See `.env.example` for a complete template.
+
+### Required
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `MQTT_BROKER` | MQTT broker IP address | `192.168.0.101` |
+
+### Network Scanning
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `START_IP` | `192.168.0.1` | First IP in the scan range |
+| `END_IP` | `192.168.0.254` | Last IP in the scan range |
+| `NETWORK_RANGE` | `192.168.0.0/24` | CIDR range for nmap scan (overrides START_IP/END_IP if set) |
+
+### Optional
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MQTT_PORT` | `1883` | MQTT broker port |
+| `MQTT_USER` | -- | MQTT username |
+| `MQTT_PASSWORD` | -- | MQTT password |
+| `MCP_SSE_PORT` | `9101` | MCP SSE transport port |
+| `REST_API_PORT` | `9102` | REST API port |
+| `IOT_SCAN_ENABLED` | `1` | Enable device discovery on startup |
+| `IOT_DATA_PATH` | `/app/data` | Persistent directory for device cache |
+
+## Supported Devices
+
+### OpenBK (OpenBeken)
+
+- **Chips**: BK7231N, BK7231T, XR809, BL602
+- **Devices**: Lights, switches, curtains, sensors
+- **Detection**: HTTP `GET /index` returns HTML containing `"openbeken"`
+
+### Tasmota
+
+- **Chips**: ESP8266, ESP32
+- **Devices**: Lights, switches, sensors, fans, plugs
+- **Detection**: HTTP `GET /cm?cmnd=Status` returns JSON with `"Status"` key
+
+## Testing
+
+```bash
+# Unit tests (no devices required -- all mocked)
+pytest tests/unit/ -v --tb=short
+```
+
+## Claude Desktop Configuration
+
+Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "tasmota-openbk": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://localhost:9101/sse"]
+    }
+  }
+}
+```
+
+## License
+
+MIT -- see [LICENSE](LICENSE) for details.
