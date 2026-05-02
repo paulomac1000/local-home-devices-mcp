@@ -20,9 +20,7 @@ class TestPowerControl:
     """Tests for power control operations."""
 
     def test_set_power_tasmota_on(self):
-        with patch(
-            "tools.iot_discovery._resolve_ip", return_value="192.168.1.100"
-        ):
+        with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
             with patch(
                 "tools.iot_discovery._detect_device_type",
                 return_value="tasmota",
@@ -40,9 +38,7 @@ class TestPowerControl:
                     assert data["resolved_from"] == "192.168.1.100"
 
     def test_set_power_tasmota_toggle(self):
-        with patch(
-            "tools.iot_discovery._resolve_ip", return_value="192.168.1.100"
-        ):
+        with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
             with patch(
                 "tools.iot_discovery._detect_device_type",
                 return_value="tasmota",
@@ -58,9 +54,7 @@ class TestPowerControl:
                     assert data["requested_state"] == "TOGGLE"
 
     def test_set_power_openbk(self):
-        with patch(
-            "tools.iot_discovery._resolve_ip", return_value="192.168.1.101"
-        ):
+        with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.101"):
             with patch(
                 "tools.iot_discovery._detect_device_type",
                 return_value="openbk",
@@ -95,12 +89,8 @@ class TestPowerControl:
                     assert data["ip"] == "192.168.1.100"
 
     def test_set_power_name_not_found(self):
-        with patch(
-            "tools.iot_discovery._resolve_ip", return_value=None
-        ):
-            with patch(
-                "tools.iot_discovery._get_cached_devices", return_value=[]
-            ):
+        with patch("tools.iot_discovery._resolve_ip", return_value=None):
+            with patch("tools.iot_discovery._get_cached_devices", return_value=[]):
                 result = _set_power("UnknownDevice", "ON")
                 data = json.loads(result)
                 assert data["success"] is False
@@ -342,9 +332,7 @@ class TestWifiConfig:
                     resp = MagicMock()
                     resp.status_code = 200
                     resp.json.return_value = {
-                        "StatusSTS": {
-                            "Wifi": {"SSId": "HomeWiFi", "RSSI": -70}
-                        }
+                        "StatusSTS": {"Wifi": {"SSId": "HomeWiFi", "RSSI": -70}}
                     }
                     mock_get.return_value = resp
                     result = _get_wifi_config("Light_Bathroom")

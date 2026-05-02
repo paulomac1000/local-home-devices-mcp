@@ -56,9 +56,7 @@ def _get_openbk_status(ip: str, timeout: int = 5) -> Dict[str, Any]:
             {"channel": int(c[0]), "value": float(c[1])} for c in channels
         ]
 
-        rssi_match = re.search(
-            r"Wifi RSSI:\s+([\w\s]+)\s*\((-?\d+)dBm\)", text
-        )
+        rssi_match = re.search(r"Wifi RSSI:\s+([\w\s]+)\s*\((-?\d+)dBm\)", text)
         if rssi_match:
             status["rssi"] = int(rssi_match.group(2))
             status["signal_quality"] = rssi_match.group(1).strip()
@@ -110,9 +108,7 @@ def _get_tasmota_status(ip: str, timeout: int = 5) -> Dict[str, Any]:
 
         wifi_data: Dict[str, Any] = {}
         try:
-            wifi_resp = requests.get(
-                f"http://{ip}/cm?cmnd=Status%205", timeout=timeout
-            )
+            wifi_resp = requests.get(f"http://{ip}/cm?cmnd=Status%205", timeout=timeout)
             if wifi_resp.status_code == 200:
                 wifi_json = wifi_resp.json()
                 wifi_data = wifi_json.get("StatusSTS", {}).get("Wifi", {})
@@ -121,9 +117,7 @@ def _get_tasmota_status(ip: str, timeout: int = 5) -> Dict[str, Any]:
 
         current_power = None
         try:
-            power_resp = requests.get(
-                f"http://{ip}/cm?cmnd=Power", timeout=timeout
-            )
+            power_resp = requests.get(f"http://{ip}/cm?cmnd=Power", timeout=timeout)
             if power_resp.status_code == 200:
                 current_power = power_resp.json().get("POWER")
         except Exception:
@@ -158,16 +152,18 @@ def _get_device_info(identifier: str) -> str:
     Returns:
         JSON string with device information.
     """
-    from tools.iot_discovery import _resolve_ip, _get_cached_devices, _detect_device_type
+    from tools.iot_discovery import (
+        _resolve_ip,
+        _get_cached_devices,
+        _detect_device_type,
+    )
 
     ip_address = _resolve_ip(identifier)
 
     if not ip_address:
         available = sorted(
             set(
-                d.get("name", "Unknown")
-                for d in _get_cached_devices()
-                if d.get("name")
+                d.get("name", "Unknown") for d in _get_cached_devices() if d.get("name")
             )
         )
         return json.dumps(
@@ -233,16 +229,18 @@ def _get_device_power(identifier: str, channel: int = 1) -> str:
     Returns:
         JSON string with power state.
     """
-    from tools.iot_discovery import _resolve_ip, _get_cached_devices, _detect_device_type
+    from tools.iot_discovery import (
+        _resolve_ip,
+        _get_cached_devices,
+        _detect_device_type,
+    )
 
     ip_address = _resolve_ip(identifier)
 
     if not ip_address:
         available = sorted(
             set(
-                d.get("name", "Unknown")
-                for d in _get_cached_devices()
-                if d.get("name")
+                d.get("name", "Unknown") for d in _get_cached_devices() if d.get("name")
             )
         )
         return json.dumps(
@@ -250,8 +248,7 @@ def _get_device_power(identifier: str, channel: int = 1) -> str:
                 "success": False,
                 "error": f"Could not resolve '{identifier}' to an IP address",
                 "suggestion": (
-                    "Run iot_discover_devices() first, "
-                    "then use iot_list_devices()"
+                    "Run iot_discover_devices() first, then use iot_list_devices()"
                 ),
                 "available_names": available[:50],
             },
@@ -262,9 +259,7 @@ def _get_device_power(identifier: str, channel: int = 1) -> str:
 
     if device_type == "tasmota":
         try:
-            resp = requests.get(
-                f"http://{ip_address}/cm?cmnd=Power", timeout=5
-            )
+            resp = requests.get(f"http://{ip_address}/cm?cmnd=Power", timeout=5)
             if resp.status_code == 200:
                 data = resp.json()
                 power_key = f"POWER{channel}"
@@ -281,16 +276,12 @@ def _get_device_power(identifier: str, channel: int = 1) -> str:
                     indent=2,
                 )
         except Exception as exc:
-            return json.dumps(
-                {"success": False, "error": str(exc)}, indent=2
-            )
+            return json.dumps({"success": False, "error": str(exc)}, indent=2)
 
     elif device_type == "openbk":
         info = _get_openbk_status(ip_address)
         channels = info.get("channels", [])
-        channel_info = next(
-            (c for c in channels if c["channel"] == channel - 1), None
-        )
+        channel_info = next((c for c in channels if c["channel"] == channel - 1), None)
         return json.dumps(
             {
                 "success": True,
@@ -299,9 +290,7 @@ def _get_device_power(identifier: str, channel: int = 1) -> str:
                 "ip": ip_address,
                 "channel": channel,
                 "state": (
-                    "ON"
-                    if channel_info and channel_info["value"] > 0
-                    else "OFF"
+                    "ON" if channel_info and channel_info["value"] > 0 else "OFF"
                 ),
                 "value": channel_info["value"] if channel_info else 0,
             },

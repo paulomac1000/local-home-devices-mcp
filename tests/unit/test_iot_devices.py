@@ -71,6 +71,7 @@ class TestGetTasmotaStatus:
     def test_get_tasmota_status_success(self):
         """Should parse Tasmota JSON and extract status."""
         with patch("tools.iot_devices.requests.get") as mock_get:
+
             def mock_response(url, **kwargs):
                 resp = MagicMock()
                 resp.status_code = 200
@@ -117,6 +118,7 @@ class TestGetTasmotaStatus:
     def test_get_tasmota_status_no_wifi(self):
         """Should handle missing WiFi data gracefully."""
         with patch("tools.iot_devices.requests.get") as mock_get:
+
             def mock_response(url, **kwargs):
                 resp = MagicMock()
                 if "Status%200" in url:
@@ -148,9 +150,7 @@ class TestGetDeviceInfo:
                 "tools.iot_discovery._detect_device_type",
                 return_value="tasmota",
             ):
-                with patch(
-                    "tools.iot_devices._get_tasmota_status"
-                ) as mock_status:
+                with patch("tools.iot_devices._get_tasmota_status") as mock_status:
                     mock_status.return_value = {
                         "name": "TestDevice",
                         "power_state": 0,
@@ -163,9 +163,7 @@ class TestGetDeviceInfo:
     def test_get_device_info_name_not_found(self):
         """Should suggest discovery when name not in cache."""
         with patch("tools.iot_discovery._resolve_ip", return_value=None):
-            with patch(
-                "tools.iot_discovery._get_cached_devices", return_value=[]
-            ):
+            with patch("tools.iot_discovery._get_cached_devices", return_value=[]):
                 result = _get_device_info("UnknownDevice")
                 data = json.loads(result)
                 assert data["success"] is False
@@ -177,9 +175,7 @@ class TestGetDevicePower:
 
     def test_get_device_power_tasmota(self):
         """Should query Tasmota power state."""
-        with patch(
-            "tools.iot_discovery._resolve_ip", return_value="192.168.1.100"
-        ):
+        with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
             with patch(
                 "tools.iot_discovery._detect_device_type",
                 return_value="tasmota",
@@ -197,16 +193,12 @@ class TestGetDevicePower:
 
     def test_get_device_power_openbk(self):
         """Should query OpenBK power state."""
-        with patch(
-            "tools.iot_discovery._resolve_ip", return_value="192.168.1.101"
-        ):
+        with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.101"):
             with patch(
                 "tools.iot_discovery._detect_device_type",
                 return_value="openbk",
             ):
-                with patch(
-                    "tools.iot_devices._get_openbk_status"
-                ) as mock_status:
+                with patch("tools.iot_devices._get_openbk_status") as mock_status:
                     mock_status.return_value = {
                         "channels": [
                             {"channel": 0, "value": 1.0},

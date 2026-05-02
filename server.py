@@ -163,9 +163,7 @@ def create_rest_app():
             if hasattr(tool, "description") and tool.description:
                 desc = tool.description
             elif (
-                hasattr(tool, "fn")
-                and hasattr(tool.fn, "__doc__")
-                and tool.fn.__doc__
+                hasattr(tool, "fn") and hasattr(tool.fn, "__doc__") and tool.fn.__doc__
             ):
                 desc = tool.fn.__doc__.strip().split("\n")[0]
             tool_list.append({"name": name, "description": desc})
@@ -227,9 +225,7 @@ def create_rest_app():
                 except json.JSONDecodeError:
                     pass
 
-            return JSONResponse(
-                {"success": True, "tool": tool_name, "result": result}
-            )
+            return JSONResponse({"success": True, "tool": tool_name, "result": result})
 
         except TypeError as exc:
             return JSONResponse(
@@ -280,9 +276,7 @@ def run_rest_api() -> None:
 
     app = create_rest_app()
     print(f"[rest] REST API started on port {REST_API_PORT}")
-    uvicorn.run(
-        app, host="0.0.0.0", port=REST_API_PORT, log_level="warning"
-    )
+    uvicorn.run(app, host="0.0.0.0", port=REST_API_PORT, log_level="warning")
 
 
 # =============================================================================
@@ -306,9 +300,7 @@ if __name__ == "__main__":
     print("[server] " + "-" * 50)
 
     # 2. Start REST API in a separate thread (port 9102)
-    rest_thread = threading.Thread(
-        target=run_rest_api, daemon=True, name="RestAPI"
-    )
+    rest_thread = threading.Thread(target=run_rest_api, daemon=True, name="RestAPI")
     rest_thread.start()
 
     print("[server] Endpoints:")

@@ -31,7 +31,9 @@ class TestGetMqttClient:
 
     def test_get_client_no_paho(self):
         """Should return None when paho-mqtt is not installed."""
-        with patch.dict("sys.modules", {"paho": None, "paho.mqtt": None, "paho.mqtt.client": None}):
+        with patch.dict(
+            "sys.modules", {"paho": None, "paho.mqtt": None, "paho.mqtt.client": None}
+        ):
             client = _get_mqtt_client()
             assert client is None
 
@@ -42,6 +44,7 @@ class TestGetMqttClient:
             mock_client_class.return_value = mock_client
             # Simulate v2 API availability
             import paho.mqtt.client as mqtt
+
             orig_cb = getattr(mqtt, "CallbackAPIVersion", None)
             mqtt.CallbackAPIVersion = MagicMock()
             mqtt.CallbackAPIVersion.VERSION1 = "VERSION1"
@@ -65,6 +68,7 @@ class TestGetMqttClient:
             mock_client_class.return_value = mock_client
             # Simulate v1 API (no CallbackAPIVersion)
             import paho.mqtt.client as mqtt
+
             orig_cb = getattr(mqtt, "CallbackAPIVersion", None)
             if hasattr(mqtt, "CallbackAPIVersion"):
                 delattr(mqtt, "CallbackAPIVersion")

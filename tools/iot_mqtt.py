@@ -28,9 +28,7 @@ def _get_mqtt_client():
 
         try:
             # paho-mqtt >= 2.0 requires callback_api_version
-            client = mqtt.Client(
-                callback_api_version=mqtt.CallbackAPIVersion.VERSION1
-            )
+            client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1)
         except (AttributeError, TypeError):
             # paho-mqtt < 2.0
             client = mqtt.Client()
@@ -60,8 +58,7 @@ def _mqtt_publish(topic: str, payload: str, retain: bool = False) -> str:
             {
                 "success": False,
                 "error": (
-                    "paho-mqtt not installed. "
-                    "Install with: pip install paho-mqtt"
+                    "paho-mqtt not installed. Install with: pip install paho-mqtt"
                 ),
             },
             indent=2,
@@ -110,9 +107,7 @@ def _mqtt_get_state(topic_prefix: str, timeout_sec: int = 5) -> str:
     received_messages: list[Dict[str, str]] = []
 
     def on_message(_client, _userdata, msg):
-        received_messages.append(
-            {"topic": msg.topic, "payload": msg.payload.decode()}
-        )
+        received_messages.append({"topic": msg.topic, "payload": msg.payload.decode()})
 
     client.on_message = on_message
     try:
@@ -220,9 +215,7 @@ def register_iot_mqtt_tools(mcp) -> None:
         return _mqtt_get_state(topic_prefix, timeout)
 
     @mcp.tool()
-    def iot_mqtt_build_command_topic(
-        device_name: str, command: str = "Power"
-    ) -> str:
+    def iot_mqtt_build_command_topic(device_name: str, command: str = "Power") -> str:
         """Build MQTT command topic for a device.
 
         Args:
