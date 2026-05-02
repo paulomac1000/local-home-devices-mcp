@@ -11,7 +11,6 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from tools.iot_discovery import (
-    CACHE_FILE,
     _detect_device_type,
     _find_device_by_identifier,
     _get_cached_devices,

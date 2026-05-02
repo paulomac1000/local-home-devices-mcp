@@ -1,6 +1,5 @@
 """Unit tests for Tasmota-OpenBK-MCP."""
 
-import pytest
 import sys
 from pathlib import Path
 

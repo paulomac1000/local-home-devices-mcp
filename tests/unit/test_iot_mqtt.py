@@ -5,8 +5,6 @@ Unit tests for IoT MCP MQTT tools.
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from tools.iot_mqtt import (
     _get_mqtt_client,
     _mqtt_build_command_topic,
@@ -130,7 +128,6 @@ class TestMqttGetState:
         """Should receive and return state message."""
         with patch("tools.iot_mqtt._get_mqtt_client") as mock_get_client:
             mock_client = MagicMock()
-            received = []
 
             def capture_on_message(*args, **kwargs):
                 if mock_client.on_message:
