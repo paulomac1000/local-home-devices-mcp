@@ -268,9 +268,7 @@ def _probe_device_info(ip: str, device_type: str, timeout: int = 5) -> Dict[str,
                 if ver_match:
                     info["version"] = ver_match.group(1)
 
-                rssi_match = re.search(
-                    r"Wifi RSSI:\s+([\w\s]+)\s*\((-?\d+)dBm\)", text
-                )
+                rssi_match = re.search(r"Wifi RSSI:\s+([\w\s]+)\s*\((-?\d+)dBm\)", text)
                 if rssi_match:
                     info["rssi"] = int(rssi_match.group(2))
                     info["signal_quality"] = rssi_match.group(1).strip()
@@ -281,8 +279,7 @@ def _probe_device_info(ip: str, device_type: str, timeout: int = 5) -> Dict[str,
 
                 channels = re.findall(r"Channel\s+(\d+)\s+=\s+([\d.]+)", text)
                 info["channels"] = [
-                    {"channel": int(c[0]), "value": float(c[1])}
-                    for c in channels
+                    {"channel": int(c[0]), "value": float(c[1])} for c in channels
                 ]
         except Exception:
             pass
@@ -338,9 +335,7 @@ def _scan_network(network_range: str, timeout: int = 5) -> List[str]:
 # =============================================================================
 
 
-def _iot_discover_devices(
-    network_range: Optional[str] = None, timeout: int = 5
-) -> str:
+def _iot_discover_devices(network_range: Optional[str] = None, timeout: int = 5) -> str:
     """Discover OpenBK and Tasmota devices on the network using nmap.
 
     Args:
@@ -512,9 +507,7 @@ def _iot_find_device_by_name(name: str) -> str:
         device = _find_device_by_identifier(name)
 
         if not device:
-            all_names = [
-                d.get("name", "Unknown") for d in _get_cached_devices()
-            ]
+            all_names = [d.get("name", "Unknown") for d in _get_cached_devices()]
             return json.dumps(
                 {
                     "success": False,

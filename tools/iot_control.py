@@ -34,19 +34,14 @@ def _build_unresolved_response(identifier: str) -> str:
     from tools.iot_discovery import _get_cached_devices
 
     available = sorted(
-        set(
-            d.get("name", "Unknown")
-            for d in _get_cached_devices()
-            if d.get("name")
-        )
+        set(d.get("name", "Unknown") for d in _get_cached_devices() if d.get("name"))
     )
     return json.dumps(
         {
             "success": False,
             "error": f"Could not resolve '{identifier}' to an IP address",
             "suggestion": (
-                "Run iot_discover_devices() first, "
-                "then use iot_list_devices()"
+                "Run iot_discover_devices() first, then use iot_list_devices()"
             ),
             "available_names": available[:50],
         },
@@ -122,9 +117,7 @@ def _set_power(identifier: str, state: str, channel: int = 1) -> str:
 
     if device_type == "openbk":
         if state == "TOGGLE":
-            resp = requests.get(
-                f"http://{ip_address}/index?tgl={channel}", timeout=5
-            )
+            resp = requests.get(f"http://{ip_address}/index?tgl={channel}", timeout=5)
         else:
             value = 1 if state == "ON" else 0
             resp = requests.get(
@@ -246,9 +239,7 @@ def _restart_device(identifier: str) -> str:
     device_type = _detect_device_type(ip_address)
 
     if device_type == "tasmota":
-        resp = requests.get(
-            f"http://{ip_address}/cm?cmnd=Restart%201", timeout=5
-        )
+        resp = requests.get(f"http://{ip_address}/cm?cmnd=Restart%201", timeout=5)
         if resp.status_code == 200:
             return json.dumps(
                 {
@@ -262,9 +253,7 @@ def _restart_device(identifier: str) -> str:
             )
 
     elif device_type == "openbk":
-        resp = requests.get(
-            f"http://{ip_address}/index?restart=1", timeout=5
-        )
+        resp = requests.get(f"http://{ip_address}/index?restart=1", timeout=5)
         if resp.status_code == 200:
             return json.dumps(
                 {
@@ -277,9 +266,7 @@ def _restart_device(identifier: str) -> str:
                 indent=2,
             )
 
-    return json.dumps(
-        {"success": False, "error": "Device not found"}, indent=2
-    )
+    return json.dumps({"success": False, "error": "Device not found"}, indent=2)
 
 
 def _get_wifi_config(identifier: str) -> str:
@@ -301,9 +288,7 @@ def _get_wifi_config(identifier: str) -> str:
     device_type = _detect_device_type(ip_address)
 
     if device_type == "tasmota":
-        resp = requests.get(
-            f"http://{ip_address}/cm?cmnd=Status%205", timeout=5
-        )
+        resp = requests.get(f"http://{ip_address}/cm?cmnd=Status%205", timeout=5)
         if resp.status_code == 200:
             data = resp.json()
             wifi = data.get("StatusSTS", {}).get("Wifi", {})
@@ -343,9 +328,7 @@ def _get_wifi_config(identifier: str) -> str:
             indent=2,
         )
 
-    return json.dumps(
-        {"success": False, "error": "Device not found"}, indent=2
-    )
+    return json.dumps({"success": False, "error": "Device not found"}, indent=2)
 
 
 def register_iot_control_tools(mcp) -> None:
@@ -371,9 +354,7 @@ def register_iot_control_tools(mcp) -> None:
             return json.dumps({"success": False, "error": str(exc)}, indent=2)
 
     @mcp.tool()
-    def iot_set_brightness(
-        identifier: str, brightness: int, channel: int = 1
-    ) -> str:
+    def iot_set_brightness(identifier: str, brightness: int, channel: int = 1) -> str:
         """Set brightness of an IoT device channel (0-100).
 
         Accepts either an IP address or a device name from the discovery cache.

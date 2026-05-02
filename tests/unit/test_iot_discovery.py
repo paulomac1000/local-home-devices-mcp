@@ -80,6 +80,7 @@ class TestProbeDeviceInfo:
 
     def test_probe_tasmota(self):
         with patch("tools.iot_discovery.requests.get") as mock_get:
+
             def mock_response(url, **kwargs):
                 resp = MagicMock()
                 resp.status_code = 200
@@ -117,6 +118,7 @@ class TestProbeDeviceInfo:
 
     def test_probe_tasmota_no_wifi_data(self):
         with patch("tools.iot_discovery.requests.get") as mock_get:
+
             def mock_response(url, **kwargs):
                 resp = MagicMock()
                 if "Status%200" in url:
@@ -257,9 +259,7 @@ class TestCacheOperations:
         fake_cache = tmp_path / "discovered_devices.json"
         monkeypatch.setattr("tools.iot_discovery.CACHE_FILE", str(fake_cache))
         # Write cache with old timestamp
-        old_time = time.strftime(
-            "%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 7200)
-        )
+        old_time = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() - 7200))
         import json as _json
 
         fake_cache.write_text(
@@ -318,9 +318,7 @@ class TestNameResolution:
     def test_find_device_by_identifier_ip(self, tmp_path, monkeypatch):
         fake_cache = tmp_path / "discovered_devices.json"
         monkeypatch.setattr("tools.iot_discovery.CACHE_FILE", str(fake_cache))
-        _save_cache(
-            [{"ip": "192.168.1.100", "name": "Light1", "type": "tasmota"}]
-        )
+        _save_cache([{"ip": "192.168.1.100", "name": "Light1", "type": "tasmota"}])
         result = _find_device_by_identifier("192.168.1.100")
         assert result["name"] == "Light1"
 
@@ -333,15 +331,9 @@ class TestDiscoveryToolImpls:
             "tools.iot_discovery._scan_network",
             return_value=["192.168.1.100", "192.168.1.101"],
         ):
-            with patch(
-                "tools.iot_discovery._detect_device_type"
-            ) as mock_detect:
-                with patch(
-                    "tools.iot_discovery._probe_device_info"
-                ) as mock_probe:
-                    with patch(
-                        "tools.iot_discovery._save_cache"
-                    ) as mock_save:
+            with patch("tools.iot_discovery._detect_device_type") as mock_detect:
+                with patch("tools.iot_discovery._probe_device_info") as mock_probe:
+                    with patch("tools.iot_discovery._save_cache") as mock_save:
                         mock_detect.side_effect = ["tasmota", "openbk"]
                         mock_probe.side_effect = [
                             {
@@ -364,9 +356,7 @@ class TestDiscoveryToolImpls:
                         assert mock_save.called
 
     def test_iot_discover_no_alive_hosts(self):
-        with patch(
-            "tools.iot_discovery._scan_network", return_value=[]
-        ):
+        with patch("tools.iot_discovery._scan_network", return_value=[]):
             result = _iot_discover_devices("10.0.0.0/24")
             data = json.loads(result)
             assert data["success"] is True
@@ -404,9 +394,7 @@ class TestDiscoveryToolImpls:
             "tools.iot_discovery._detect_device_type",
             return_value="tasmota",
         ):
-            with patch(
-                "tools.iot_discovery._probe_device_info"
-            ) as mock_probe:
+            with patch("tools.iot_discovery._probe_device_info") as mock_probe:
                 mock_probe.return_value = {
                     "ip": "192.168.1.100",
                     "type": "tasmota",
@@ -419,9 +407,7 @@ class TestDiscoveryToolImpls:
                 assert data["is_iot_device"] is True
 
     def test_iot_check_device_not_found(self):
-        with patch(
-            "tools.iot_discovery._detect_device_type", return_value=None
-        ):
+        with patch("tools.iot_discovery._detect_device_type", return_value=None):
             result = _iot_check_device("192.168.1.1")
             data = json.loads(result)
             assert data["success"] is True
