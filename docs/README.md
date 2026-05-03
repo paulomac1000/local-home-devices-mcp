@@ -263,6 +263,58 @@ pytest tests/integration/ -v
 
 ---
 
+## FAQ
+
+### Do I need an MQTT broker?
+
+No. The server works without MQTT for:
+- Device discovery (via nmap and HTTP)
+- Device info retrieval (via HTTP)
+- Power/brightness control (via HTTP)
+
+MQTT is only required for the MQTT-specific tools:
+- `iot_mqtt_publish`
+- `iot_mqtt_get_state`
+- `iot_mqtt_build_command_topic`
+
+### Why does Docker use `--network host`?
+
+The server needs direct access to your local network to:
+1. Run nmap scans for device discovery
+2. Communicate with devices via HTTP on port 80
+3. Reach your MQTT broker (if used)
+
+Without host networking, Docker's default bridge network cannot reach local network devices.
+
+### nmap requires root/sudo - is this a security concern?
+
+In Docker, nmap runs inside the container with elevated privileges (needed for raw socket scanning). This is isolated within the container and does not affect your host system.
+
+For local Python execution, run with sudo or add your user to the `sudo` group.
+
+### Can I use this without Docker?
+
+Yes. Install dependencies and run directly:
+
+```bash
+pip install -r requirements.txt
+# May require: sudo apt-get install nmap
+MQTT_BROKER=192.168.0.101 python server.py
+```
+
+### How does device caching work?
+
+Discovered devices are cached in `/app/data/discovered_devices.json` (or `data/` locally). Cache expires after 1 hour (3600 seconds). Run `iot_discover_devices()` to refresh.
+
+### Which devices are supported?
+
+- **Tasmota**: Any device running Tasmota firmware (ESP8266/ESP32)
+- **OpenBK**: Any device running OpenBeken firmware (BK7231N/T, XR809, BL602)
+
+Detection is automatic based on HTTP response patterns.
+
+---
+
 ## Troubleshooting
 
 ### Devices not discovered
@@ -271,6 +323,14 @@ pytest tests/integration/ -v
 2. Check `IOT_SCAN_ENABLED=1` in `.env`
 3. Verify devices respond to HTTP on port 80
 4. Try manual check: `curl http://{device_ip}/cm?cmnd=Status`
+5. **nmap permission issues**: If running locally (not in Docker), nmap may require root. Try: `sudo nmap -sn 192.168.0.0/24`
+
+### nmap scan fails or returns no hosts
+
+- Verify nmap is installed: `nmap --version`
+- Check network range in `.env` matches your local network
+- Some networks block ICMP (ping) - nmap still works but may be slower
+- Firewall may be blocking scans - try a smaller range first
 
 ### MQTT commands fail
 
@@ -278,6 +338,12 @@ pytest tests/integration/ -v
 2. Check MQTT port (default 1883) is not blocked
 3. Ensure MQTT credentials are correct (if authentication enabled)
 4. Verify device is configured with the same MQTT broker
+5. **Note:** Default `MQTT_BROKER=192.168.0.101` is just a placeholder - set your actual broker IP in `.env`
+
+### Server starts but shows warnings
+
+- The default MQTT broker IP (192.168.0.101) may be unreachable - this is fine unless you need MQTT tools
+- If you see "Address already in use" on ports 9100-9102, another instance may be running
 
 ### Control commands fail
 

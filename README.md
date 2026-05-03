@@ -7,11 +7,23 @@
 
 MCP (Model Context Protocol) server for IoT device management. Enables AI assistants (Claude Desktop, LibreChat, Cline) to discover and control OpenBK (OpenBeken) and Tasmota devices on your local network.
 
+## What is MCP?
+
+MCP (Model Context Protocol) is a standardized protocol that allows AI assistants to call external tools through a defined interface. Think of it as a bridge between AI models and your local network:
+
+- **AI Assistant** → sends request → **MCP Server** → queries devices
+- **AI Assistant** ← receives response ← **MCP Server** ← returns device data
+
+This project exposes your IoT devices as MCP tools, so you can control them using natural language through any MCP-compatible client.
+
 ## Requirements
 
-- Python 3.11+ (for local use) or Docker
-- MQTT broker (e.g., Mosquitto) on your network
+- Docker (recommended) or Python 3.11+ (for local use)
+- MQTT broker (optional - required only for MQTT tools)
 - OpenBK or Tasmota devices on the same local network
+- **nmap** - installed automatically in Docker; for local use, install via `apt-get install nmap` (may require root/sudo)
+
+**Note on networking:** Docker uses `--network host` mode to access the local network where your IoT devices are located. This is required for nmap scanning and direct HTTP communication with devices.
 
 ## Quick Start
 
@@ -127,11 +139,13 @@ curl -X POST http://localhost:9102/api/tools/iot_list_devices \
 
 All configuration is via environment variables. See `.env.example` for a complete template.
 
-### Required
+### Required for MQTT tools (optional otherwise)
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `MQTT_BROKER` | MQTT broker IP address | `192.168.0.101` |
+
+> **Tip:** Without MQTT broker, device discovery and HTTP control still work. Set `MQTT_BROKER` only if you need MQTT-based tools (`iot_mqtt_publish`, `iot_mqtt_get_state`, etc.).
 
 ### Network Scanning
 
