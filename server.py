@@ -13,7 +13,6 @@ Architecture:
 
 import inspect
 import json
-import os
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -21,6 +20,8 @@ from typing import Any, Dict, Optional
 
 from fastmcp import FastMCP
 
+from tools.constants import DEFAULT_NETWORK_RANGE, END_IP, MCP_SSE_PORT, MQTT_BROKER
+from tools.constants import MQTT_PORT, REST_API_PORT, START_IP
 from tools.iot_control import register_iot_control_tools
 from tools.iot_devices import register_iot_device_tools
 from tools.iot_discovery import register_iot_discovery_tools
@@ -72,17 +73,6 @@ def start_health_server(port: int = 9100) -> HTTPServer:
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-
-MQTT_BROKER = os.getenv("MQTT_BROKER", "192.168.0.101")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-MCP_SSE_PORT = int(os.getenv("MCP_SSE_PORT", "9101"))
-REST_API_PORT = int(os.getenv("REST_API_PORT", "9102"))
-START_IP = os.getenv("START_IP", "192.168.0.1")
-END_IP = os.getenv("END_IP", "192.168.0.254")
-
-# Build default network range for discovery
-_default_octets = START_IP.rsplit(".", 1)[0]
-DEFAULT_NETWORK_RANGE = os.getenv("NETWORK_RANGE", f"{_default_octets}.0/24")
 
 # =============================================================================
 # INITIALIZE MCP SERVER

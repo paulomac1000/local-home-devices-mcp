@@ -10,6 +10,7 @@ from tools.iot_mqtt import (
     _mqtt_build_command_topic,
     _mqtt_get_state,
     _mqtt_publish,
+    register_iot_mqtt_tools,
 )
 
 
@@ -191,3 +192,90 @@ class TestMqttBuildCommandTopic:
         result = _mqtt_build_command_topic("tasmota_12345")
         data = json.loads(result)
         assert data["command"] == "Power"
+
+
+class TestMqttGetStateErrors:
+    """Error path tests for MQTT state retrieval."""
+
+    def test_get_state_connect_exception(self):
+        """Should handle MQTT connect exception."""
+        with patch("tools.iot_mqtt._get_mqtt_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_client.connect.side_effect = Exception("Broker unreachable")
+            mock_get_client.return_value = mock_client
+            result = _mqtt_get_state("test", timeout_sec=1)
+            data = json.loads(result)
+            assert data["success"] is False
+            assert "Broker unreachable" in data["error"]
+
+    def test_get_state_non_json_payload(self):
+        """Should handle non-JSON payload gracefully."""
+        with patch("tools.iot_mqtt._get_mqtt_client") as mock_get_client:
+            mock_client = MagicMock()
+
+            def capture_on_message(*args, **kwargs):
+                if mock_client.on_message:
+                    msg = MagicMock()
+                    msg.topic = "tele/test/STATE"
+                    msg.payload = b"ON"
+                    mock_client.on_message(mock_client, None, msg)
+
+            mock_client.loop_start.side_effect = capture_on_message
+            mock_get_client.return_value = mock_client
+
+            with patch("tools.iot_mqtt.time.sleep"):
+                result = _mqtt_get_state("test", timeout_sec=1)
+                data = json.loads(result)
+                assert data["success"] is True
+                assert data["state"] == "ON"
+
+
+class TestMqttRegistrationWrappers:
+    """Tests for MCP tool registration wrappers."""
+
+    def test_registration_creates_three_tools(self, mock_mcp):
+        register_iot_mqtt_tools(mock_mcp)
+        assert "iot_mqtt_publish" in mock_mcp._tools
+        assert "iot_mqtt_get_state" in mock_mcp._tools
+        assert "iot_mqtt_build_command_topic" in mock_mcp._tools
+
+    def test_iot_mqtt_publish_wrapper(self, mock_mcp):
+        register_iot_mqtt_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_mqtt_publish")
+        with patch("tools.iot_mqtt._get_mqtt_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_result = MagicMock()
+            mock_result.rc = 0
+            mock_client.publish.return_value = mock_result
+            mock_get_client.return_value = mock_client
+            result = fn("cmnd/test/Power", "ON")
+            data = json.loads(result)
+            assert data["success"] is True
+
+    def test_iot_mqtt_get_state_wrapper(self, mock_mcp):
+        register_iot_mqtt_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_mqtt_get_state")
+        with patch("tools.iot_mqtt._get_mqtt_client") as mock_get_client:
+            mock_client = MagicMock()
+
+            def capture_on_message(*args, **kwargs):
+                if mock_client.on_message:
+                    msg = MagicMock()
+                    msg.topic = "tele/test/STATE"
+                    msg.payload = b'{"POWER":"ON"}'
+                    mock_client.on_message(mock_client, None, msg)
+
+            mock_client.loop_start.side_effect = capture_on_message
+            mock_get_client.return_value = mock_client
+            with patch("tools.iot_mqtt.time.sleep"):
+                result = fn("test", timeout=1)
+                data = json.loads(result)
+                assert data["success"] is True
+
+    def test_iot_mqtt_build_command_topic_wrapper(self, mock_mcp):
+        register_iot_mqtt_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_mqtt_build_command_topic")
+        result = fn("tasmota_test")
+        data = json.loads(result)
+        assert data["success"] is True
+        assert "command_topic" in data

@@ -17,8 +17,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY server.py .
 COPY tools/ ./tools/
-COPY conftest.py ./
-COPY tests/ ./tests/
 
 RUN mkdir -p /app/data
 

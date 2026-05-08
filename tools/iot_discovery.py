@@ -16,6 +16,8 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from tools.constants import DEFAULT_NETWORK_RANGE
+
 # =============================================================================
 # CACHE CONFIGURATION
 # =============================================================================
@@ -25,12 +27,6 @@ DATA_DIR = os.path.join(
 )
 CACHE_FILE = os.path.join(DATA_DIR, "discovered_devices.json")
 CACHE_TTL_SECONDS = 3600  # 1 hour
-
-# Default network range from environment or fallback
-_START_IP = os.getenv("START_IP", "192.168.0.1")
-_END_IP = os.getenv("END_IP", "192.168.0.254")
-_DEFAULT_OCTETS = _START_IP.rsplit(".", 1)[0]
-DEFAULT_NETWORK_RANGE = os.getenv("NETWORK_RANGE", f"{_DEFAULT_OCTETS}.0/24")
 
 __all__ = [
     "register_iot_discovery_tools",

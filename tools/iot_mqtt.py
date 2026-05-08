@@ -9,10 +9,10 @@ import os
 import time
 from typing import Dict
 
+from tools.constants import MQTT_BROKER, MQTT_PORT
+
 __all__ = ["register_iot_mqtt_tools", "_get_mqtt_client", "_mqtt_publish"]
 
-MQTT_BROKER = os.getenv("MQTT_BROKER", "192.168.0.101")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USER = os.getenv("MQTT_USER", "")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
 

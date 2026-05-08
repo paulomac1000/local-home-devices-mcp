@@ -167,6 +167,14 @@ All configuration is via environment variables. See `.env.example` for a complet
 | `IOT_SCAN_ENABLED` | `1` | Enable device discovery on startup |
 | `IOT_DATA_PATH` | `/app/data` | Persistent directory for device cache |
 
+## Project Structure
+
+- `tools/constants.py` — All shared configuration defaults (no hardcoded IPs in tool files)
+- `tools/iot_control.py` — Power/brightness/restart/WiFi control (4 tools)
+- `tools/iot_devices.py` — Device info/power state (2 tools)
+- `tools/iot_discovery.py` — Network scanning/device discovery/cache (4 tools)
+- `tools/iot_mqtt.py` — MQTT publish/state/topic (3 tools)
+
 ## Supported Devices
 
 ### OpenBK (OpenBeken)
@@ -183,10 +191,16 @@ All configuration is via environment variables. See `.env.example` for a complet
 
 ## Testing
 
-```bash
-# Unit tests (no devices required -- all mocked)
-pytest tests/unit/ -v --tb=short
-```
+The project has a 4-tier test hierarchy (see `AGENTS.md` for details):
+
+| Suite | Tests | Coverage | Command |
+|-------|-------|----------|---------|
+| Unit | 130 | **100%** | `pytest tests/unit/ -v --tb=short` |
+| Integration | 20 | **66%** | `pytest tests/integration/ -q` |
+| Smoke | 17 | HTTP validation | `pytest tests/smoke/ -q` |
+| E2E | 6 | HTTP validation | `pytest tests/e2e/ -q` |
+
+Unit tests run in CI. Integration, smoke, and e2e tests skip when their dependencies (MQTT broker, running server) are absent.
 
 ## Claude Desktop Configuration
 
