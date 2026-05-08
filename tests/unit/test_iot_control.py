@@ -130,7 +130,9 @@ class TestPowerControlErrors:
 
     def test_set_power_tasmota_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="tasmota"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 500
@@ -142,7 +144,9 @@ class TestPowerControlErrors:
 
     def test_set_power_openbk_toggle(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.101"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="openbk"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200
@@ -154,7 +158,9 @@ class TestPowerControlErrors:
 
     def test_set_power_openbk_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.101"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="openbk"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 403
@@ -166,7 +172,9 @@ class TestPowerControlErrors:
 
     def test_set_power_unsupported_device_type(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="zigbee"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="zigbee"
+            ):
                 result = _set_power("192.168.1.100", "ON")
                 data = json.loads(result)
                 assert data["success"] is False
@@ -270,7 +278,9 @@ class TestBrightnessControlErrors:
 
     def test_set_brightness_unsupported_type(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="esphome"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="esphome"
+            ):
                 result = _set_brightness("192.168.1.100", 50)
                 data = json.loads(result)
                 assert data["success"] is False
@@ -278,7 +288,9 @@ class TestBrightnessControlErrors:
 
     def test_set_brightness_tasmota_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="tasmota"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 500
@@ -359,7 +371,9 @@ class TestRestartErrors:
 
     def test_restart_tasmota_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="tasmota"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 500
@@ -474,7 +488,9 @@ class TestWifiConfigErrors:
 
     def test_get_wifi_tasmota_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="tasmota"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 503
@@ -486,7 +502,9 @@ class TestWifiConfigErrors:
 
     def test_get_wifi_unsupported_type(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="matter"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="matter"
+            ):
                 result = _get_wifi_config("192.168.1.100")
                 data = json.loads(result)
                 assert data["success"] is False
@@ -507,7 +525,9 @@ class TestRegistrationWrappers:
         register_iot_control_tools(mock_mcp)
         fn = mock_mcp.get_tool("iot_set_power")
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="tasmota"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200
@@ -521,7 +541,9 @@ class TestRegistrationWrappers:
         register_iot_control_tools(mock_mcp)
         fn = mock_mcp.get_tool("iot_set_brightness")
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="tasmota"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200
@@ -534,7 +556,9 @@ class TestRegistrationWrappers:
         register_iot_control_tools(mock_mcp)
         fn = mock_mcp.get_tool("iot_restart_device")
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="tasmota"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200
@@ -547,7 +571,9 @@ class TestRegistrationWrappers:
         register_iot_control_tools(mock_mcp)
         fn = mock_mcp.get_tool("iot_get_wifi_config")
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+            with patch(
+                "tools.iot_discovery._detect_device_type", return_value="tasmota"
+            ):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200

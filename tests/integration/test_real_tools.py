@@ -59,12 +59,16 @@ class TestIntegrationDeviceInfo:
     """Device info tools — error paths via MCP wrapper."""
 
     def test_get_device_info_name_not_found(self, mcp_client):
-        data = _get_result(mcp_client, "iot_get_device_info", identifier="NoSuchDevice_XYZ")
+        data = _get_result(
+            mcp_client, "iot_get_device_info", identifier="NoSuchDevice_XYZ"
+        )
         assert data["success"] is False
         assert "Could not resolve" in data["error"]
 
     def test_get_device_power_name_not_found(self, mcp_client):
-        data = _get_result(mcp_client, "iot_get_device_power", identifier="NoSuchDevice_XYZ")
+        data = _get_result(
+            mcp_client, "iot_get_device_power", identifier="NoSuchDevice_XYZ"
+        )
         assert data["success"] is False
         assert "Could not resolve" in data["error"]
 
@@ -73,26 +77,39 @@ class TestIntegrationControlErrors:
     """Control tools — error paths (no real devices needed)."""
 
     def test_set_power_name_not_found(self, mcp_client):
-        data = _get_result(mcp_client, "iot_set_power", identifier="NoSuchDevice_XYZ", state="ON")
+        data = _get_result(
+            mcp_client, "iot_set_power", identifier="NoSuchDevice_XYZ", state="ON"
+        )
         assert data["success"] is False
         assert "Could not resolve" in data["error"]
 
     def test_set_power_invalid_state(self, mcp_client):
-        data = _get_result(mcp_client, "iot_set_power", identifier="192.168.1.100", state="INVALID")
+        data = _get_result(
+            mcp_client, "iot_set_power", identifier="192.168.1.100", state="INVALID"
+        )
         assert data["success"] is False
 
     def test_set_brightness_name_not_found(self, mcp_client):
-        data = _get_result(mcp_client, "iot_set_brightness", identifier="NoSuchDevice_XYZ", brightness=50)
+        data = _get_result(
+            mcp_client,
+            "iot_set_brightness",
+            identifier="NoSuchDevice_XYZ",
+            brightness=50,
+        )
         assert data["success"] is False
         assert "Could not resolve" in data["error"]
 
     def test_restart_name_not_found(self, mcp_client):
-        data = _get_result(mcp_client, "iot_restart_device", identifier="NoSuchDevice_XYZ")
+        data = _get_result(
+            mcp_client, "iot_restart_device", identifier="NoSuchDevice_XYZ"
+        )
         assert data["success"] is False
         assert "Could not resolve" in data["error"]
 
     def test_get_wifi_name_not_found(self, mcp_client):
-        data = _get_result(mcp_client, "iot_get_wifi_config", identifier="NoSuchDevice_XYZ")
+        data = _get_result(
+            mcp_client, "iot_get_wifi_config", identifier="NoSuchDevice_XYZ"
+        )
         assert data["success"] is False
         assert "Could not resolve" in data["error"]
 
@@ -101,11 +118,15 @@ class TestIntegrationDeviceErrorPaths:
     """Device error paths via unreachable IPs."""
 
     def test_get_device_info_unreachable_ip(self, mcp_client):
-        data = _get_result(mcp_client, "iot_get_device_info", identifier="192.168.1.199")
+        data = _get_result(
+            mcp_client, "iot_get_device_info", identifier="192.168.1.199"
+        )
         assert data["success"] is False
 
     def test_get_device_power_unreachable_ip(self, mcp_client):
-        data = _get_result(mcp_client, "iot_get_device_power", identifier="192.168.1.199")
+        data = _get_result(
+            mcp_client, "iot_get_device_power", identifier="192.168.1.199"
+        )
         assert data["success"] is False
 
 
@@ -113,15 +134,27 @@ class TestIntegrationMQTT:
     """MQTT operations against the configured broker."""
 
     def test_build_command_topic(self, mcp_client):
-        data = _get_result(mcp_client, "iot_mqtt_build_command_topic", device_name="tasmota_test")
+        data = _get_result(
+            mcp_client, "iot_mqtt_build_command_topic", device_name="tasmota_test"
+        )
         assert data.get("success") is True
 
     def test_mqtt_publish(self, mcp_client):
-        data = _get_result(mcp_client, "iot_mqtt_publish", topic="test/integration/ping", payload="pong")
+        data = _get_result(
+            mcp_client,
+            "iot_mqtt_publish",
+            topic="test/integration/ping",
+            payload="pong",
+        )
         assert "success" in data
 
     def test_mqtt_get_state_timeout(self, mcp_client):
-        data = _get_result(mcp_client, "iot_mqtt_get_state", topic_prefix="nonexistent_device_test", timeout=2)
+        data = _get_result(
+            mcp_client,
+            "iot_mqtt_get_state",
+            topic_prefix="nonexistent_device_test",
+            timeout=2,
+        )
         assert "success" in data
 
 

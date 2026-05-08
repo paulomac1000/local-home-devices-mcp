@@ -61,7 +61,9 @@ class TestControlSmoke:
         assert data["success"] is True
 
     def test_set_brightness_returns_success(self):
-        data = _call_tool("iot_set_brightness", identifier="192.168.1.100", brightness=50)
+        data = _call_tool(
+            "iot_set_brightness", identifier="192.168.1.100", brightness=50
+        )
         assert data["success"] is True
 
     def test_restart_device_returns_success(self):
@@ -134,4 +136,6 @@ class TestResponseFormat:
         for tool_name in self.ALL_TOOLS:
             data = self._call_safe(tool_name, **call_map.get(tool_name, {}))
             assert data is not None, f"Tool '{tool_name}' did not respond"
-            assert data.get("success") is not None, f"Tool '{tool_name}' missing 'success' field"
+            assert data.get("success") is not None, (
+                f"Tool '{tool_name}' missing 'success' field"
+            )

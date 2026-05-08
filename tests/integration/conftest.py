@@ -59,9 +59,7 @@ class MCPWrapper:
         tool = tools.get(tool_name)
         if tool is None:
             available = list(tools.keys())
-            raise ValueError(
-                f"Tool '{tool_name}' not found among {available}"
-            )
+            raise ValueError(f"Tool '{tool_name}' not found among {available}")
         fn = getattr(tool, "fn", tool)
         if inspect.iscoroutinefunction(fn):
             return _run_async(fn, **kwargs)

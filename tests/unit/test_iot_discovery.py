@@ -449,7 +449,9 @@ class TestCacheEdgeCases:
         monkeypatch.setattr("tools.iot_discovery.CACHE_FILE", str(fake_cache))
         import json as _json
 
-        fake_cache.write_text(_json.dumps({"version": 1, "last_scan": None, "devices": []}))
+        fake_cache.write_text(
+            _json.dumps({"version": 1, "last_scan": None, "devices": []})
+        )
         assert _is_cache_fresh() is False
 
     def test_cache_fresh_invalid_timestamp(self, tmp_path, monkeypatch):
