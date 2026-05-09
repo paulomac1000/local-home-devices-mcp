@@ -534,7 +534,10 @@ def register_iot_discovery_tools(mcp) -> None:
         Returns:
             JSON with discovered devices list and scan summary.
         """
-        return _iot_discover_devices(network_range, timeout)
+        try:
+            return _iot_discover_devices(network_range, timeout)
+        except Exception as exc:
+            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
 
     @mcp.tool()
     def iot_list_devices() -> str:
@@ -545,7 +548,10 @@ def register_iot_discovery_tools(mcp) -> None:
         Returns:
             JSON with cached devices or suggestion to run discovery.
         """
-        return _iot_list_devices()
+        try:
+            return _iot_list_devices()
+        except Exception as exc:
+            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
 
     @mcp.tool()
     def iot_check_device(ip_address: str) -> str:
@@ -557,7 +563,10 @@ def register_iot_discovery_tools(mcp) -> None:
         Returns:
             JSON with device identification.
         """
-        return _iot_check_device(ip_address)
+        try:
+            return _iot_check_device(ip_address)
+        except Exception as exc:
+            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
 
     @mcp.tool()
     def iot_find_device_by_name(name: str) -> str:
@@ -569,4 +578,7 @@ def register_iot_discovery_tools(mcp) -> None:
         Returns:
             JSON with matching device or error if not found.
         """
-        return _iot_find_device_by_name(name)
+        try:
+            return _iot_find_device_by_name(name)
+        except Exception as exc:
+            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)

@@ -26,12 +26,14 @@ from tools.constants import (
     BIND_HOST,
     DEFAULT_NETWORK_RANGE,
     END_IP,
+    HEALTH_CHECK_PORT,
     MCP_SSE_PORT,
     MQTT_BROKER,
     MQTT_PORT,
     REST_API_PORT,
     START_IP,
     TOOL_MANIFESTS,
+    TOOLS_VERSION,
 )
 from tools.iot_control import register_iot_control_tools
 from tools.iot_devices import register_iot_device_tools
@@ -144,7 +146,7 @@ def create_rest_app():
             {
                 "status": "healthy",
                 "server": "IoT-Observer",
-                "version": "1.1.0",
+                "version": TOOLS_VERSION,
                 "tools_registered": get_tool_count(),
                 "endpoints": {
                     "mcp_sse": f"http://{BIND_HOST}:{MCP_SSE_PORT}/sse",
@@ -311,7 +313,7 @@ if __name__ == "__main__":
         )
 
     # 1. Start health check server (port 9100)
-    start_health_server(port=9100)
+    start_health_server(port=HEALTH_CHECK_PORT)
     HEALTH_STATE["status"] = "healthy"
     HEALTH_STATE["last_heartbeat"] = time.time()
 
@@ -330,7 +332,7 @@ if __name__ == "__main__":
     rest_thread.start()
 
     print("[server] Endpoints:", file=sys.stderr)
-    print(f"[server]   Health:      http://{BIND_HOST}:9100/health", file=sys.stderr)
+    print(f"[server]   Health:      http://{BIND_HOST}:{HEALTH_CHECK_PORT}/health", file=sys.stderr)
     print(f"[server]   MCP SSE:     http://{BIND_HOST}:{MCP_SSE_PORT}/sse", file=sys.stderr)
     print(f"[server]   MCP MSG:     http://{BIND_HOST}:{MCP_SSE_PORT}/messages", file=sys.stderr)
     print(f"[server]   REST API:    http://{BIND_HOST}:{REST_API_PORT}/api/", file=sys.stderr)

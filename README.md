@@ -164,8 +164,6 @@ All configuration is via environment variables. See `.env.example` for a complet
 | `MQTT_PASSWORD` | -- | MQTT password |
 | `MCP_SSE_PORT` | `9101` | MCP SSE transport port |
 | `REST_API_PORT` | `9102` | REST API port |
-| `IOT_SCAN_ENABLED` | `1` | Enable device discovery on startup |
-| `IOT_DATA_PATH` | `/app/data` | Persistent directory for device cache |
 
 ## Project Structure
 

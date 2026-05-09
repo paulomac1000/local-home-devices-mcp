@@ -8,6 +8,8 @@ NETWORK_RANGE = os.getenv("NETWORK_RANGE")
 MCP_SSE_PORT = int(os.getenv("MCP_SSE_PORT", "9101"))
 REST_API_PORT = int(os.getenv("REST_API_PORT", "9102"))
 
+HEALTH_CHECK_PORT = int(os.getenv("HEALTH_CHECK_PORT", "9100"))
+
 BIND_HOST = os.getenv("BIND_HOST", "127.0.0.1")
 ALLOW_PUBLIC_BIND = os.getenv("ALLOW_PUBLIC_BIND", "0") == "1"
 
@@ -29,7 +31,7 @@ def _error(message, code="INTERNAL_ERROR", retryable=False, suggestion=None):
     return {"success": False, "error": err}
 
 
-TOOLS_VERSION = "1.0.0"
+TOOLS_VERSION = "1.2.0"
 
 TOOL_MANIFESTS = {
     "iot_discover_devices": {"risk": "READ", "idempotent": True, "timeout_ms": 120000},

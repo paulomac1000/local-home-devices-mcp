@@ -195,7 +195,10 @@ def register_iot_mqtt_tools(mcp) -> None:
         Returns:
             JSON with result.
         """
-        return _mqtt_publish(topic, payload, retain)
+        try:
+            return _mqtt_publish(topic, payload, retain)
+        except Exception as exc:
+            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
 
     @mcp.tool()
     def iot_mqtt_get_state(topic_prefix: str, timeout: int = 5) -> str:
@@ -210,7 +213,10 @@ def register_iot_mqtt_tools(mcp) -> None:
         Returns:
             JSON with device state.
         """
-        return _mqtt_get_state(topic_prefix, timeout)
+        try:
+            return _mqtt_get_state(topic_prefix, timeout)
+        except Exception as exc:
+            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
 
     @mcp.tool()
     def iot_mqtt_build_command_topic(device_name: str, command: str = "Power") -> str:
@@ -223,4 +229,7 @@ def register_iot_mqtt_tools(mcp) -> None:
         Returns:
             JSON with topic information.
         """
-        return _mqtt_build_command_topic(device_name, command)
+        try:
+            return _mqtt_build_command_topic(device_name, command)
+        except Exception as exc:
+            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)

@@ -120,8 +120,6 @@ All configuration via environment variables. See `.env.example` for a complete t
 | `MQTT_PASSWORD` | — | MQTT password (if authentication enabled) |
 | `MCP_SSE_PORT` | `9101` | MCP SSE transport port |
 | `REST_API_PORT` | `9102` | REST API port |
-| `IOT_SCAN_ENABLED` | `1` | Enable automatic device discovery on startup |
-| `IOT_DATA_PATH` | `/app/data` | Persistent directory for device cache |
 
 ---
 
@@ -347,9 +345,8 @@ Detection is automatic based on HTTP response patterns.
 ### Devices not discovered
 
 1. Ensure devices are on the same network as the server
-2. Check `IOT_SCAN_ENABLED=1` in `.env`
-3. Verify devices respond to HTTP on port 80
-4. Try manual check: `curl http://{device_ip}/cm?cmnd=Status`
+2. Verify nmap is installed: `docker exec tasmota-openbk-mcp nmap --version`
+3. Try manual check: `curl http://{device_ip}/cm?cmnd=Status`
 5. **nmap permission issues**: If running locally (not in Docker), nmap may require root. Try: `sudo nmap -sn 192.168.0.0/24`
 
 ### nmap scan fails or returns no hosts

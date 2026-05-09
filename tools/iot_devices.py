@@ -310,7 +310,10 @@ def register_iot_device_tools(mcp) -> None:
         Returns:
             JSON with device information.
         """
-        return _get_device_info(identifier)
+        try:
+            return _get_device_info(identifier)
+        except Exception as exc:
+            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
 
     @mcp.tool()
     def iot_get_device_power(identifier: str, channel: int = 1) -> str:
@@ -325,4 +328,7 @@ def register_iot_device_tools(mcp) -> None:
         Returns:
             JSON with power state.
         """
-        return _get_device_power(identifier, channel)
+        try:
+            return _get_device_power(identifier, channel)
+        except Exception as exc:
+            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
