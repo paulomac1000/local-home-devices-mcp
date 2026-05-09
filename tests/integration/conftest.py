@@ -16,15 +16,15 @@ for env_path in env_paths:
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
                         key, value = line.split("=", 1)
-                        os.environ.setdefault(
-                            key.strip(), value.strip().strip('"').strip("'")
-                        )
+                        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
         except Exception:
             pass
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "")
 
-iot_configured = bool(MQTT_BROKER)
+_PLACEHOLDER_VALUES = {"", "your_broker_here", "192.168.0.101"}
+
+iot_configured = bool(MQTT_BROKER) and MQTT_BROKER not in _PLACEHOLDER_VALUES
 
 
 def _run_async(func, *args, **kwargs):

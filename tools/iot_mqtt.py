@@ -7,9 +7,8 @@ Interact with IoT devices via MQTT broker.
 import json
 import os
 import time
-from typing import Dict
 
-from tools.constants import MQTT_BROKER, MQTT_PORT
+from tools.constants import MQTT_BROKER, MQTT_PORT, _error, _success
 
 __all__ = ["register_iot_mqtt_tools", "_get_mqtt_client", "_mqtt_publish"]
 
@@ -55,12 +54,10 @@ def _mqtt_publish(topic: str, payload: str, retain: bool = False) -> str:
     client = _get_mqtt_client()
     if not client:
         return json.dumps(
-            {
-                "success": False,
-                "error": (
-                    "paho-mqtt not installed. Install with: pip install paho-mqtt"
-                ),
-            },
+            _error(
+                "paho-mqtt not installed. Install with: pip install paho-mqtt",
+                code="DEPENDENCY_MISSING",
+            ),
             indent=2,
         )
 
@@ -70,18 +67,19 @@ def _mqtt_publish(topic: str, payload: str, retain: bool = False) -> str:
         client.disconnect()
 
         return json.dumps(
-            {
-                "success": True,
-                "broker": f"{MQTT_BROKER}:{MQTT_PORT}",
-                "topic": topic,
-                "payload": payload,
-                "retain": retain,
-                "mqtt_result": result.rc,
-            },
+            _success(
+                {
+                    "broker": f"{MQTT_BROKER}:{MQTT_PORT}",
+                    "topic": topic,
+                    "payload": payload,
+                    "retain": retain,
+                    "mqtt_result": result.rc,
+                }
+            ),
             indent=2,
         )
     except Exception as exc:
-        return json.dumps({"success": False, "error": str(exc)}, indent=2)
+        return json.dumps(_error(str(exc)), indent=2)
 
 
 def _mqtt_get_state(topic_prefix: str, timeout_sec: int = 5) -> str:
@@ -99,12 +97,12 @@ def _mqtt_get_state(topic_prefix: str, timeout_sec: int = 5) -> str:
     client = _get_mqtt_client()
     if not client:
         return json.dumps(
-            {"success": False, "error": "paho-mqtt not installed"},
+            _error("paho-mqtt not installed", code="DEPENDENCY_MISSING"),
             indent=2,
         )
 
     state_topic = f"tele/{topic_prefix}/STATE"
-    received_messages: list[Dict[str, str]] = []
+    received_messages: list[dict[str, str]] = []
 
     def on_message(_client, _userdata, msg):
         received_messages.append({"topic": msg.topic, "payload": msg.payload.decode()})
@@ -118,16 +116,14 @@ def _mqtt_get_state(topic_prefix: str, timeout_sec: int = 5) -> str:
         client.loop_stop()
         client.disconnect()
     except Exception as exc:
-        return json.dumps({"success": False, "error": str(exc)}, indent=2)
+        return json.dumps(_error(str(exc)), indent=2)
 
     if not received_messages:
         return json.dumps(
-            {
-                "success": False,
-                "error": "No state message received within timeout",
-                "topic": state_topic,
-                "timeout": timeout_sec,
-            },
+            _error(
+                "No state message received within timeout",
+                code="TIMEOUT",
+            ),
             indent=2,
         )
 
@@ -138,12 +134,13 @@ def _mqtt_get_state(topic_prefix: str, timeout_sec: int = 5) -> str:
         payload = latest["payload"]
 
     return json.dumps(
-        {
-            "success": True,
-            "topic": latest["topic"],
-            "state": payload,
-            "messages_received": len(received_messages),
-        },
+        _success(
+            {
+                "topic": latest["topic"],
+                "state": payload,
+                "messages_received": len(received_messages),
+            }
+        ),
         indent=2,
     )
 
@@ -163,21 +160,22 @@ def _mqtt_build_command_topic(device_name: str, command: str = "Power") -> str:
     tele_topic = f"tele/{device_name}/STATE"
 
     return json.dumps(
-        {
-            "success": True,
-            "device_name": device_name,
-            "command": command,
-            "command_topic": topic,
-            "state_topic": state_topic,
-            "telemetry_topic": tele_topic,
-            "example_payloads": {
-                "ON": "Turn device ON",
-                "OFF": "Turn device OFF",
-                "TOGGLE": "Toggle device state",
-                "0": "Set brightness/channel to 0",
-                "100": "Set brightness/channel to 100",
-            },
-        },
+        _success(
+            {
+                "device_name": device_name,
+                "command": command,
+                "command_topic": topic,
+                "state_topic": state_topic,
+                "telemetry_topic": tele_topic,
+                "example_payloads": {
+                    "ON": "Turn device ON",
+                    "OFF": "Turn device OFF",
+                    "TOGGLE": "Toggle device state",
+                    "0": "Set brightness/channel to 0",
+                    "100": "Set brightness/channel to 100",
+                },
+            }
+        ),
         indent=2,
     )
 
@@ -187,7 +185,7 @@ def register_iot_mqtt_tools(mcp) -> None:
 
     @mcp.tool()
     def iot_mqtt_publish(topic: str, payload: str, retain: bool = False) -> str:
-        """Publish an MQTT message to control an IoT device.
+        """[WRITE] Publish an MQTT message to control an IoT device.
 
         Args:
             topic: MQTT topic (e.g. "cmnd/tasmota_389AF7/Power").
@@ -201,7 +199,7 @@ def register_iot_mqtt_tools(mcp) -> None:
 
     @mcp.tool()
     def iot_mqtt_get_state(topic_prefix: str, timeout: int = 5) -> str:
-        """Get current state of a device via MQTT.
+        """[READ] Get current state of a device via MQTT.
 
         Subscribes to the state topic and returns the latest value.
 
@@ -216,7 +214,7 @@ def register_iot_mqtt_tools(mcp) -> None:
 
     @mcp.tool()
     def iot_mqtt_build_command_topic(device_name: str, command: str = "Power") -> str:
-        """Build MQTT command topic for a device.
+        """[READ] Build MQTT command topic for a device.
 
         Args:
             device_name: Device MQTT topic (e.g. "tasmota_389AF7").

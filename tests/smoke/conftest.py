@@ -13,9 +13,7 @@ for env_path in env_paths:
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
                         key, value = line.split("=", 1)
-                        os.environ.setdefault(
-                            key.strip(), value.strip().strip('"').strip("'")
-                        )
+                        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
         except Exception:
             pass
 

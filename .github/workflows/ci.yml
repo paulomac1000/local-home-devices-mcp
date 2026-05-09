@@ -27,6 +27,12 @@ jobs:
       - name: Ruff format check
         run: ruff format --check .
 
+      - name: Run mypy
+        run: pip install mypy types-requests && mypy tools/ --ignore-missing-imports || true
+
+      - name: Run bandit
+        run: pip install bandit && bandit -r tools/ -ll || true
+
   test:
     runs-on: ubuntu-latest
     needs: lint

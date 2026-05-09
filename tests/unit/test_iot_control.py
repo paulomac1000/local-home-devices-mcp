@@ -34,9 +34,9 @@ class TestPowerControl:
                     result = _set_power("192.168.1.100", "ON")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["device_type"] == "tasmota"
-                    assert data["actual_state"] == "ON"
-                    assert data["resolved_from"] == "192.168.1.100"
+                    assert data["data"]["device_type"] == "tasmota"
+                    assert data["data"]["actual_state"] == "ON"
+                    assert data["data"]["resolved_from"] == "192.168.1.100"
 
     def test_set_power_tasmota_toggle(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
@@ -52,7 +52,7 @@ class TestPowerControl:
                     result = _set_power("192.168.1.100", "TOGGLE")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["requested_state"] == "TOGGLE"
+                    assert data["data"]["requested_state"] == "TOGGLE"
 
     def test_set_power_openbk(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.101"):
@@ -67,7 +67,7 @@ class TestPowerControl:
                     result = _set_power("192.168.1.101", "ON")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["device_type"] == "openbk"
+                    assert data["data"]["device_type"] == "openbk"
 
     def test_set_power_by_name(self):
         with patch(
@@ -86,8 +86,8 @@ class TestPowerControl:
                     result = _set_power("Light_Bathroom", "ON")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["resolved_from"] == "Light_Bathroom"
-                    assert data["ip"] == "192.168.1.100"
+                    assert data["data"]["resolved_from"] == "Light_Bathroom"
+                    assert data["data"]["ip"] == "192.168.1.100"
 
     def test_set_power_name_not_found(self):
         with patch("tools.iot_discovery._resolve_ip", return_value=None):
@@ -95,7 +95,7 @@ class TestPowerControl:
                 result = _set_power("UnknownDevice", "ON")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Could not resolve" in data["error"]
+                assert "Could not resolve" in data["error"]["message"]
 
     def test_set_power_invalid_state(self):
         with patch(
@@ -109,7 +109,7 @@ class TestPowerControl:
                 result = _set_power("192.168.1.100", "INVALID")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Invalid state" in data["error"]
+                assert "Invalid state" in data["error"]["message"]
 
     def test_set_power_device_not_found(self):
         with patch(
@@ -130,9 +130,7 @@ class TestPowerControlErrors:
 
     def test_set_power_tasmota_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="tasmota"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 500
@@ -140,13 +138,11 @@ class TestPowerControlErrors:
                     result = _set_power("192.168.1.100", "ON")
                     data = json.loads(result)
                     assert data["success"] is False
-                    assert "HTTP 500" in data["error"]
+                    assert "HTTP 500" in data["error"]["message"]
 
     def test_set_power_openbk_toggle(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.101"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="openbk"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200
@@ -154,13 +150,11 @@ class TestPowerControlErrors:
                     result = _set_power("192.168.1.101", "TOGGLE")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["requested_state"] == "TOGGLE"
+                    assert data["data"]["requested_state"] == "TOGGLE"
 
     def test_set_power_openbk_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.101"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="openbk"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 403
@@ -168,17 +162,15 @@ class TestPowerControlErrors:
                     result = _set_power("192.168.1.101", "ON")
                     data = json.loads(result)
                     assert data["success"] is False
-                    assert "HTTP 403" in data["error"]
+                    assert "HTTP 403" in data["error"]["message"]
 
     def test_set_power_unsupported_device_type(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="zigbee"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="zigbee"):
                 result = _set_power("192.168.1.100", "ON")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Unsupported device type" in data["error"]
+                assert "Unsupported device type" in data["error"]["message"]
 
 
 class TestBrightnessControl:
@@ -200,7 +192,7 @@ class TestBrightnessControl:
                     result = _set_brightness("192.168.1.100", 75)
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["brightness"] == 75
+                    assert data["data"]["brightness"] == 75
 
     def test_set_brightness_by_name(self):
         with patch(
@@ -218,7 +210,7 @@ class TestBrightnessControl:
                     result = _set_brightness("Light_LivingRoom", 50)
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["resolved_from"] == "Light_LivingRoom"
+                    assert data["data"]["resolved_from"] == "Light_LivingRoom"
 
     def test_set_brightness_clamped_high(self):
         with patch(
@@ -236,7 +228,7 @@ class TestBrightnessControl:
                     result = _set_brightness("192.168.1.101", 150)
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["brightness"] == 100
+                    assert data["data"]["brightness"] == 100
 
     def test_set_brightness_clamped_low(self):
         with patch(
@@ -254,7 +246,7 @@ class TestBrightnessControl:
                     result = _set_brightness("192.168.1.101", -10)
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["brightness"] == 0
+                    assert data["data"]["brightness"] == 0
 
 
 class TestBrightnessControlErrors:
@@ -266,7 +258,7 @@ class TestBrightnessControlErrors:
                 result = _set_brightness("UnknownDevice", 50)
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Could not resolve" in data["error"]
+                assert "Could not resolve" in data["error"]["message"]
 
     def test_set_brightness_device_not_found(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.200"):
@@ -274,23 +266,19 @@ class TestBrightnessControlErrors:
                 result = _set_brightness("192.168.1.200", 50)
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "No IoT device found" in data["error"]
+                assert "No IoT device found" in data["error"]["message"]
 
     def test_set_brightness_unsupported_type(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="esphome"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="esphome"):
                 result = _set_brightness("192.168.1.100", 50)
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Unsupported device type" in data["error"]
+                assert "Unsupported device type" in data["error"]["message"]
 
     def test_set_brightness_tasmota_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="tasmota"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 500
@@ -319,7 +307,7 @@ class TestRestart:
                     result = _restart_device("192.168.1.100")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert "Restart command sent" in data["message"]
+                    assert "Restart command sent" in data["data"]["message"]
 
     def test_restart_openbk(self):
         with patch(
@@ -337,7 +325,7 @@ class TestRestart:
                     result = _restart_device("192.168.1.101")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["device_type"] == "openbk"
+                    assert data["data"]["device_type"] == "openbk"
 
     def test_restart_by_name(self):
         with patch(
@@ -355,7 +343,7 @@ class TestRestart:
                     result = _restart_device("Curtains_LivingRoom")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["resolved_from"] == "Curtains_LivingRoom"
+                    assert data["data"]["resolved_from"] == "Curtains_LivingRoom"
 
 
 class TestRestartErrors:
@@ -367,13 +355,11 @@ class TestRestartErrors:
                 result = _restart_device("UnknownDevice")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Could not resolve" in data["error"]
+                assert "Could not resolve" in data["error"]["message"]
 
     def test_restart_tasmota_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="tasmota"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 500
@@ -381,7 +367,7 @@ class TestRestartErrors:
                     result = _restart_device("192.168.1.100")
                     data = json.loads(result)
                     assert data["success"] is False
-                    assert "Device not found" in data["error"]
+                    assert "Device not found" in data["error"]["message"]
 
     def test_restart_unsupported_type(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
@@ -389,7 +375,7 @@ class TestRestartErrors:
                 result = _restart_device("192.168.1.100")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Device not found" in data["error"]
+                assert "Device not found" in data["error"]["message"]
 
 
 class TestWifiConfig:
@@ -424,9 +410,9 @@ class TestWifiConfig:
                     result = _get_wifi_config("192.168.1.100")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["wifi"]["ssid"] == "MyNetwork"
-                    assert data["wifi"]["rssi"] == -60
-                    assert data["wifi"]["mac"] == "AA:BB:CC:DD:EE:FF"
+                    assert data["data"]["wifi"]["ssid"] == "MyNetwork"
+                    assert data["data"]["wifi"]["rssi"] == -60
+                    assert data["data"]["wifi"]["mac"] == "AA:BB:CC:DD:EE:FF"
 
     def test_get_wifi_openbk(self):
         with patch(
@@ -451,7 +437,7 @@ class TestWifiConfig:
                     result = _get_wifi_config("192.168.1.101")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["wifi"]["rssi"] == -55
+                    assert data["data"]["wifi"]["rssi"] == -55
 
     def test_get_wifi_by_name(self):
         with patch(
@@ -472,7 +458,7 @@ class TestWifiConfig:
                     result = _get_wifi_config("Light_Bathroom")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["resolved_from"] == "Light_Bathroom"
+                    assert data["data"]["resolved_from"] == "Light_Bathroom"
 
 
 class TestWifiConfigErrors:
@@ -484,13 +470,11 @@ class TestWifiConfigErrors:
                 result = _get_wifi_config("UnknownDevice")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Could not resolve" in data["error"]
+                assert "Could not resolve" in data["error"]["message"]
 
     def test_get_wifi_tasmota_http_error(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="tasmota"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 503
@@ -498,17 +482,15 @@ class TestWifiConfigErrors:
                     result = _get_wifi_config("192.168.1.100")
                     data = json.loads(result)
                     assert data["success"] is False
-                    assert "Device not found" in data["error"]
+                    assert "Device not found" in data["error"]["message"]
 
     def test_get_wifi_unsupported_type(self):
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="matter"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="matter"):
                 result = _get_wifi_config("192.168.1.100")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Device not found" in data["error"]
+                assert "Device not found" in data["error"]["message"]
 
 
 class TestRegistrationWrappers:
@@ -525,9 +507,7 @@ class TestRegistrationWrappers:
         register_iot_control_tools(mock_mcp)
         fn = mock_mcp.get_tool("iot_set_power")
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="tasmota"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200
@@ -541,9 +521,7 @@ class TestRegistrationWrappers:
         register_iot_control_tools(mock_mcp)
         fn = mock_mcp.get_tool("iot_set_brightness")
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="tasmota"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200
@@ -556,9 +534,7 @@ class TestRegistrationWrappers:
         register_iot_control_tools(mock_mcp)
         fn = mock_mcp.get_tool("iot_restart_device")
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="tasmota"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200
@@ -571,9 +547,7 @@ class TestRegistrationWrappers:
         register_iot_control_tools(mock_mcp)
         fn = mock_mcp.get_tool("iot_get_wifi_config")
         with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
-            with patch(
-                "tools.iot_discovery._detect_device_type", return_value="tasmota"
-            ):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
                 with patch("tools.iot_control.requests.get") as mock_get:
                     resp = MagicMock()
                     resp.status_code = 200
@@ -602,7 +576,7 @@ class TestRegistrationWrappers:
             result = fn("192.168.1.100", "ON")
             data = json.loads(result)
             assert data["success"] is False
-            assert "boom" in data["error"]
+            assert "boom" in data["error"]["message"]
 
     def test_set_brightness_wrapper_exception_handler(self, mock_mcp):
         register_iot_control_tools(mock_mcp)
@@ -611,7 +585,7 @@ class TestRegistrationWrappers:
             result = fn("192.168.1.100", 50)
             data = json.loads(result)
             assert data["success"] is False
-            assert "bad" in data["error"]
+            assert "bad" in data["error"]["message"]
 
     def test_restart_wrapper_exception_handler(self, mock_mcp):
         register_iot_control_tools(mock_mcp)
@@ -620,7 +594,7 @@ class TestRegistrationWrappers:
             result = fn("192.168.1.100")
             data = json.loads(result)
             assert data["success"] is False
-            assert "io" in data["error"]
+            assert "io" in data["error"]["message"]
 
     def test_get_wifi_wrapper_exception_handler(self, mock_mcp):
         register_iot_control_tools(mock_mcp)
@@ -629,4 +603,4 @@ class TestRegistrationWrappers:
             result = fn("192.168.1.100")
             data = json.loads(result)
             assert data["success"] is False
-            assert "fail" in data["error"]
+            assert "fail" in data["error"]["message"]

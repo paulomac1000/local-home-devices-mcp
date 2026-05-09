@@ -70,7 +70,9 @@ class TestGetOpenBKStatus:
         with patch("tools.iot_devices.requests.get") as mock_get:
             resp = MagicMock()
             resp.status_code = 200
-            resp.text = '<html><head><title>Test</title></head><body data-initial="3600"></body></html>'
+            resp.text = (
+                '<html><head><title>Test</title></head><body data-initial="3600"></body></html>'
+            )
             mock_get.return_value = resp
             status = _get_openbk_status("192.168.1.101")
             assert status["uptime_seconds"] == 3600
@@ -239,7 +241,7 @@ class TestGetDeviceInfo:
                     result = _get_device_info("192.168.1.100")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["ip_address"] == "192.168.1.100"
+                    assert data["data"]["ip_address"] == "192.168.1.100"
 
     def test_get_device_info_name_not_found(self):
         """Should suggest discovery when name not in cache."""
@@ -248,7 +250,7 @@ class TestGetDeviceInfo:
                 result = _get_device_info("UnknownDevice")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Could not resolve" in data["error"]
+                assert "Could not resolve" in data["error"]["message"]
 
     def test_get_device_info_openbk(self):
         """Should route to OpenBK status for openbk devices."""
@@ -265,7 +267,7 @@ class TestGetDeviceInfo:
                     result = _get_device_info("192.168.1.101")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["device_type"] == "openbk"
+                    assert data["data"]["device_type"] == "openbk"
 
     def test_get_device_info_device_not_found_at_ip(self):
         """Should error when no device detected at IP."""
@@ -274,7 +276,7 @@ class TestGetDeviceInfo:
                 result = _get_device_info("192.168.1.200")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "No IoT device found" in data["error"]
+                assert "No IoT device found" in data["error"]["message"]
 
     def test_get_device_info_unknown_type(self):
         """Should error for unsupported device type."""
@@ -286,7 +288,7 @@ class TestGetDeviceInfo:
                 result = _get_device_info("192.168.1.100")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Unknown device type" in data["error"]
+                assert "Unknown device type" in data["error"]["message"]
 
     def test_get_device_info_status_error_propagation(self):
         """Should propagate error from status function."""
@@ -300,7 +302,7 @@ class TestGetDeviceInfo:
                     result = _get_device_info("192.168.1.100")
                     data = json.loads(result)
                     assert data["success"] is False
-                    assert "Device unreachable" in data["error"]
+                    assert "Device unreachable" in data["error"]["message"]
 
 
 class TestGetDevicePower:
@@ -322,7 +324,7 @@ class TestGetDevicePower:
                     result = _get_device_power("192.168.1.100")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["state"] == "ON"
+                    assert data["data"]["state"] == "ON"
 
     def test_get_device_power_openbk(self):
         """Should query OpenBK power state."""
@@ -340,8 +342,8 @@ class TestGetDevicePower:
                     result = _get_device_power("192.168.1.101")
                     data = json.loads(result)
                     assert data["success"] is True
-                    assert data["state"] == "ON"
-                    assert data["value"] == 1.0
+                    assert data["data"]["state"] == "ON"
+                    assert data["data"]["value"] == 1.0
 
     def test_get_device_power_name_not_resolved(self):
         """Should suggest discovery when name not in cache."""
@@ -350,7 +352,7 @@ class TestGetDevicePower:
                 result = _get_device_power("UnknownDevice")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Could not resolve" in data["error"]
+                assert "Could not resolve" in data["error"]["message"]
 
     def test_get_device_power_tasmota_exception(self):
         """Should handle Tasmota power request exception."""
@@ -366,7 +368,7 @@ class TestGetDevicePower:
                     result = _get_device_power("192.168.1.100")
                     data = json.loads(result)
                     assert data["success"] is False
-                    assert "Timeout" in data["error"]
+                    assert "Timeout" in data["error"]["message"]
 
     def test_get_device_power_unknown_type(self):
         """Should error for unsupported device type."""
@@ -378,7 +380,7 @@ class TestGetDevicePower:
                 result = _get_device_power("192.168.1.100")
                 data = json.loads(result)
                 assert data["success"] is False
-                assert "Device not found or unsupported" in data["error"]
+                assert "Device not found or unsupported" in data["error"]["message"]
 
 
 class TestDeviceRegistrationWrappers:

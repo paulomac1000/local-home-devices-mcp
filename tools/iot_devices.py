@@ -7,9 +7,11 @@ Supports lookup by IP address or device name from the discovery cache.
 
 import json
 import re
-from typing import Any, Dict
+from typing import Any
 
 import requests
+
+from tools.constants import _error, _success
 
 __all__ = [
     "register_iot_device_tools",
@@ -20,7 +22,7 @@ __all__ = [
 ]
 
 
-def _get_openbk_status(ip: str, timeout: int = 5) -> Dict[str, Any]:
+def _get_openbk_status(ip: str, timeout: int = 5) -> dict[str, Any]:
     """Get full status from an OpenBK device.
 
     Args:
@@ -36,7 +38,7 @@ def _get_openbk_status(ip: str, timeout: int = 5) -> Dict[str, Any]:
             return {"error": f"HTTP {resp.status_code}"}
 
         text = resp.text
-        status: Dict[str, Any] = {
+        status: dict[str, Any] = {
             "name": None,
             "channels": [],
             "rssi": None,
@@ -52,9 +54,7 @@ def _get_openbk_status(ip: str, timeout: int = 5) -> Dict[str, Any]:
             status["name"] = title_match.group(1).strip()
 
         channels = re.findall(r"Channel\s+(\d+)\s+=\s+([\d.]+)", text)
-        status["channels"] = [
-            {"channel": int(c[0]), "value": float(c[1])} for c in channels
-        ]
+        status["channels"] = [{"channel": int(c[0]), "value": float(c[1])} for c in channels]
 
         rssi_match = re.search(r"Wifi RSSI:\s+([\w\s]+)\s*\((-?\d+)dBm\)", text)
         if rssi_match:
@@ -88,7 +88,7 @@ def _get_openbk_status(ip: str, timeout: int = 5) -> Dict[str, Any]:
         return {"error": str(exc)}
 
 
-def _get_tasmota_status(ip: str, timeout: int = 5) -> Dict[str, Any]:
+def _get_tasmota_status(ip: str, timeout: int = 5) -> dict[str, Any]:
     """Get full status from a Tasmota device.
 
     Args:
@@ -106,7 +106,7 @@ def _get_tasmota_status(ip: str, timeout: int = 5) -> Dict[str, Any]:
         data = resp.json()
         status = data.get("Status", {})
 
-        wifi_data: Dict[str, Any] = {}
+        wifi_data: dict[str, Any] = {}
         try:
             wifi_resp = requests.get(f"http://{ip}/cm?cmnd=Status%205", timeout=timeout)
             if wifi_resp.status_code == 200:
@@ -153,29 +153,21 @@ def _get_device_info(identifier: str) -> str:
         JSON string with device information.
     """
     from tools.iot_discovery import (
-        _resolve_ip,
-        _get_cached_devices,
         _detect_device_type,
+        _get_cached_devices,
+        _resolve_ip,
     )
 
     ip_address = _resolve_ip(identifier)
 
     if not ip_address:
-        available = sorted(
-            set(
-                d.get("name", "Unknown") for d in _get_cached_devices() if d.get("name")
-            )
-        )
+        sorted(set(d.get("name", "Unknown") for d in _get_cached_devices() if d.get("name")))
         return json.dumps(
-            {
-                "success": False,
-                "error": f"Could not resolve '{identifier}' to an IP address",
-                "suggestion": (
-                    "Run iot_discover_devices() to populate the cache, "
-                    "then use iot_list_devices() to see available names"
-                ),
-                "available_names": available[:50],
-            },
+            _error(
+                f"Could not resolve '{identifier}' to an IP address",
+                code="NAME_NOT_RESOLVED",
+                suggestion="Run iot_discover_devices() to populate the cache, then use iot_list_devices()",
+            ),
             indent=2,
         )
 
@@ -183,13 +175,10 @@ def _get_device_info(identifier: str) -> str:
 
     if not device_type:
         return json.dumps(
-            {
-                "success": False,
-                "error": (
-                    f"No IoT device found at {ip_address} "
-                    f"(resolved from '{identifier}')"
-                ),
-            },
+            _error(
+                f"No IoT device found at {ip_address} (resolved from '{identifier}')",
+                code="DEVICE_NOT_FOUND",
+            ),
             indent=2,
         )
 
@@ -199,21 +188,28 @@ def _get_device_info(identifier: str) -> str:
         info = _get_tasmota_status(ip_address)
     else:
         return json.dumps(
-            {"success": False, "error": f"Unknown device type: {device_type}"},
+            _error(
+                f"Unknown device type: {device_type}",
+                code="UNSUPPORTED_TYPE",
+            ),
             indent=2,
         )
 
     if "error" in info:
-        return json.dumps({"success": False, "error": info["error"]}, indent=2)
+        return json.dumps(
+            _error(info["error"], code="INTERNAL_ERROR"),
+            indent=2,
+        )
 
     return json.dumps(
-        {
-            "success": True,
-            "resolved_from": identifier,
-            "ip_address": ip_address,
-            "device_type": device_type,
-            "info": info,
-        },
+        _success(
+            {
+                "resolved_from": identifier,
+                "ip_address": ip_address,
+                "device_type": device_type,
+                "info": info,
+            }
+        ),
         indent=2,
         ensure_ascii=False,
     )
@@ -230,28 +226,21 @@ def _get_device_power(identifier: str, channel: int = 1) -> str:
         JSON string with power state.
     """
     from tools.iot_discovery import (
-        _resolve_ip,
-        _get_cached_devices,
         _detect_device_type,
+        _get_cached_devices,
+        _resolve_ip,
     )
 
     ip_address = _resolve_ip(identifier)
 
     if not ip_address:
-        available = sorted(
-            set(
-                d.get("name", "Unknown") for d in _get_cached_devices() if d.get("name")
-            )
-        )
+        sorted(set(d.get("name", "Unknown") for d in _get_cached_devices() if d.get("name")))
         return json.dumps(
-            {
-                "success": False,
-                "error": f"Could not resolve '{identifier}' to an IP address",
-                "suggestion": (
-                    "Run iot_discover_devices() first, then use iot_list_devices()"
-                ),
-                "available_names": available[:50],
-            },
+            _error(
+                f"Could not resolve '{identifier}' to an IP address",
+                code="NAME_NOT_RESOLVED",
+                suggestion="Run iot_discover_devices() first, then use iot_list_devices()",
+            ),
             indent=2,
         )
 
@@ -265,40 +254,43 @@ def _get_device_power(identifier: str, channel: int = 1) -> str:
                 power_key = f"POWER{channel}"
                 state = data.get(power_key) or data.get("POWER")
                 return json.dumps(
-                    {
-                        "success": True,
-                        "device_type": "tasmota",
-                        "resolved_from": identifier,
-                        "ip": ip_address,
-                        "channel": channel,
-                        "state": state,
-                    },
+                    _success(
+                        {
+                            "device_type": "tasmota",
+                            "resolved_from": identifier,
+                            "ip": ip_address,
+                            "channel": channel,
+                            "state": state,
+                        }
+                    ),
                     indent=2,
                 )
         except Exception as exc:
-            return json.dumps({"success": False, "error": str(exc)}, indent=2)
+            return json.dumps(
+                _error(str(exc), code="INTERNAL_ERROR"),
+                indent=2,
+            )
 
     elif device_type == "openbk":
         info = _get_openbk_status(ip_address)
         channels = info.get("channels", [])
         channel_info = next((c for c in channels if c["channel"] == channel - 1), None)
         return json.dumps(
-            {
-                "success": True,
-                "device_type": "openbk",
-                "resolved_from": identifier,
-                "ip": ip_address,
-                "channel": channel,
-                "state": (
-                    "ON" if channel_info and channel_info["value"] > 0 else "OFF"
-                ),
-                "value": channel_info["value"] if channel_info else 0,
-            },
+            _success(
+                {
+                    "device_type": "openbk",
+                    "resolved_from": identifier,
+                    "ip": ip_address,
+                    "channel": channel,
+                    "state": ("ON" if channel_info and channel_info["value"] > 0 else "OFF"),
+                    "value": channel_info["value"] if channel_info else 0,
+                }
+            ),
             indent=2,
         )
 
     return json.dumps(
-        {"success": False, "error": "Device not found or unsupported"},
+        _error("Device not found or unsupported", code="UNSUPPORTED_TYPE"),
         indent=2,
     )
 
@@ -308,7 +300,7 @@ def register_iot_device_tools(mcp) -> None:
 
     @mcp.tool()
     def iot_get_device_info(identifier: str) -> str:
-        """Get detailed information about an IoT device.
+        """[READ] Get detailed information about an IoT device.
 
         Accepts either an IP address or a device name from the discovery cache.
 
@@ -322,7 +314,7 @@ def register_iot_device_tools(mcp) -> None:
 
     @mcp.tool()
     def iot_get_device_power(identifier: str, channel: int = 1) -> str:
-        """Get power state of a specific channel on an IoT device.
+        """[READ] Get power state of a specific channel on an IoT device.
 
         Accepts either an IP address or a device name from the discovery cache.
 
