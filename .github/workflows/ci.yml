@@ -36,6 +36,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: lint
+    services:
+      mosquitto:
+        image: eclipse-mosquitto:latest
+        ports:
+          - 1883:1883
     steps:
       - uses: actions/checkout@v4
 
@@ -51,6 +56,12 @@ jobs:
 
       - name: Run unit tests
         run: pytest tests/unit/ -v --tb=short
+
+      - name: Run integration tests
+        env:
+          MQTT_BROKER: localhost
+        run: |
+          pytest tests/integration/ -v --tb=short
 
   docker-build:
     runs-on: ubuntu-latest
@@ -82,6 +93,11 @@ jobs:
   smoke-test:
     runs-on: ubuntu-latest
     needs: docker-build
+    services:
+      mosquitto:
+        image: eclipse-mosquitto:latest
+        ports:
+          - 1883:1883
     steps:
       - uses: actions/checkout@v4
 
@@ -108,6 +124,7 @@ jobs:
       - name: Smoke test — REST API health + tools
         run: |
           docker run -d --rm --network host \
+            -e MQTT_BROKER=localhost \
             --name mcp-smoke tasmota-openbk-mcp:test
           sleep 5
           curl -fsS --retry 5 --retry-delay 2 http://localhost:9100/health || exit 1

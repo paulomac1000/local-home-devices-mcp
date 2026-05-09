@@ -22,7 +22,7 @@ for env_path in env_paths:
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "")
 
-_PLACEHOLDER_VALUES = {"", "your_broker_here", "192.168.0.101"}
+_PLACEHOLDER_VALUES = {"", "your_broker_here"}
 
 iot_configured = bool(MQTT_BROKER) and MQTT_BROKER not in _PLACEHOLDER_VALUES
 
