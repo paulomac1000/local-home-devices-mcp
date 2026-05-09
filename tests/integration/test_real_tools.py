@@ -16,12 +16,18 @@ def _get_result(mcp_client, tool_name, **kwargs):
     return json.loads(result) if isinstance(result, str) else result
 
 
+def _get_data(mcp_client, tool_name, **kwargs):
+    """Call tool and return the data portion of the response."""
+    result = _get_result(mcp_client, tool_name, **kwargs)
+    return result.get("data", {})
+
+
 def _pick_device_name(mcp_client):
     """Get first cached device with a valid name, or return dummy."""
     data = _get_result(mcp_client, "iot_list_devices")
     if not data.get("success"):
         return {"name": "NoDevice", "ip": "192.168.1.199"}
-    devices = data.get("devices", [])
+    devices = _get_data(mcp_client, "iot_list_devices").get("devices", [])
     for dev in devices:
         name = dev.get("name")
         if name and name.strip() and name != "None":
