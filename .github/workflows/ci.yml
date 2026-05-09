@@ -61,6 +61,7 @@ jobs:
         env:
           MQTT_BROKER: localhost
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq nmap
           pytest tests/integration/ -v --tb=short
 
   docker-build:

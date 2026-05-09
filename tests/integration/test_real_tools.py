@@ -147,6 +147,13 @@ class TestIntegrationMQTT:
 class TestIntegrationRealDeviceReadOnly:
     """Read-only operations against real discovered devices (safe, no state changes)."""
 
+    @pytest.fixture(autouse=True)
+    def _skip_if_no_devices(self, mcp_client):
+        data = _get_result(mcp_client, "iot_list_devices")
+        devices = data.get("data", {}).get("devices", [])
+        if not devices:
+            pytest.skip("No real devices in cache — CI environment with no Tasmota/OpenBK")
+
     def test_get_device_info_by_real_name(self, mcp_client):
         dev = _pick_device_name(mcp_client)
         data = _get_result(mcp_client, "iot_get_device_info", identifier=dev["name"])
