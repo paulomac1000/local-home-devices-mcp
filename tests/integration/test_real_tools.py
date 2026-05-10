@@ -142,7 +142,7 @@ class TestIntegrationMQTT:
             mcp_client,
             "iot_mqtt_get_state",
             topic_prefix="nonexistent_device_test",
-            timeout=2,
+            timeout_seconds=2,
         )
         assert "success" in data
 
