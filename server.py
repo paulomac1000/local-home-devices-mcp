@@ -109,12 +109,12 @@ register_iot_mqtt_tools(mcp)
 # =============================================================================
 
 
-def get_all_tools() -> dict[str, Any]:
+def get_all_tools() -> Any:
     """Return a dictionary of all registered tools."""
     if hasattr(mcp, "_tool_manager") and hasattr(mcp._tool_manager, "_tools"):
-        return mcp._tool_manager._tools  # type: ignore[union-attr]
+        return mcp._tool_manager._tools
     if hasattr(mcp, "_tools"):
-        return mcp._tools  # type: ignore[return-value]
+        return mcp._tools
     return {}
 
 
@@ -136,7 +136,7 @@ tool_count = get_tool_count()
 # =============================================================================
 
 
-def create_rest_app():
+def create_rest_app() -> Any:
     """Create REST API application for tools (alternative access, not MCP)."""
     from starlette.applications import Starlette
     from starlette.middleware import Middleware
@@ -144,7 +144,7 @@ def create_rest_app():
     from starlette.responses import JSONResponse
     from starlette.routing import Route
 
-    async def health(request):
+    async def health(request: Any) -> JSONResponse:
         return JSONResponse(
             {
                 "status": "healthy",
@@ -160,7 +160,7 @@ def create_rest_app():
             }
         )
 
-    async def list_tools_endpoint(request):
+    async def list_tools_endpoint(request: Any) -> JSONResponse:
         tools = get_all_tools()
         tool_list = []
         for name, tool in tools.items():
@@ -174,11 +174,11 @@ def create_rest_app():
             {
                 "success": True,
                 "total": len(tool_list),
-                "tools": sorted(tool_list, key=lambda x: x["name"]),
+                "tools": sorted(tool_list, key=lambda x: str(x.get("name", ""))),
             }
         )
 
-    async def call_tool_endpoint(request):
+    async def call_tool_endpoint(request: Any) -> JSONResponse:
         tool_name = request.path_params.get("tool_name", "")
 
         try:
@@ -250,7 +250,7 @@ def create_rest_app():
                 status_code=500,
             )
 
-    async def tool_manifest_endpoint(request):
+    async def tool_manifest_endpoint(request: Any) -> JSONResponse:
         tool_name = request.path_params.get("tool_name", "")
         manifest = TOOL_MANIFESTS.get(tool_name)
         if manifest is None:

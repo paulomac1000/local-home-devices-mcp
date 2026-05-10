@@ -510,7 +510,7 @@ def get_tool_manifest(tool_name: str) -> dict[str, Any] | None:
     return TOOL_MANIFESTS.get(tool_name)
 
 
-def inject_tool_risk_prefix(func):
+def inject_tool_risk_prefix(func: Any) -> Any:
     """Inject [READ]/[WRITE]/[DANGEROUS] risk prefix from TOOL_MANIFESTS into func.__doc__.
 
     The prefix is prepended only if the docstring does not already start with '['.
