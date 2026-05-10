@@ -27,6 +27,8 @@ from tools.iot_discovery import (
     register_iot_discovery_tools,
 )
 
+pytestmark = pytest.mark.unit
+
 
 class TestDetectDeviceType:
     """Tests for device type detection."""

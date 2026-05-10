@@ -5,6 +5,8 @@ Unit tests for IoT MCP device information tools.
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from tools.iot_devices import (
     _get_device_info,
     _get_device_power,
@@ -12,6 +14,8 @@ from tools.iot_devices import (
     _get_tasmota_status,
     register_iot_device_tools,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class TestGetOpenBKStatus:

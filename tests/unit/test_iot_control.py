@@ -8,6 +8,8 @@ with name resolution from the discovery cache.
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from tools.iot_control import (
     _get_wifi_config,
     _restart_device,
@@ -15,6 +17,8 @@ from tools.iot_control import (
     _set_power,
     register_iot_control_tools,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class TestPowerControl:
@@ -212,7 +216,7 @@ class TestBrightnessControl:
                     assert data["success"] is True
                     assert data["data"]["resolved_from"] == "Light_LivingRoom"
 
-    def test_set_brightness_clamped_high(self):
+    def test_set_brightness_rejected_high(self):
         with patch(
             "tools.iot_discovery._resolve_ip",
             return_value="192.168.1.101",
@@ -227,10 +231,10 @@ class TestBrightnessControl:
                     mock_get.return_value = resp
                     result = _set_brightness("192.168.1.101", 150)
                     data = json.loads(result)
-                    assert data["success"] is True
-                    assert data["data"]["brightness"] == 100
+                    assert data["success"] is False
+                    assert "0-100" in data["error"]["message"]
 
-    def test_set_brightness_clamped_low(self):
+    def test_set_brightness_rejected_low(self):
         with patch(
             "tools.iot_discovery._resolve_ip",
             return_value="192.168.1.101",
@@ -245,8 +249,8 @@ class TestBrightnessControl:
                     mock_get.return_value = resp
                     result = _set_brightness("192.168.1.101", -10)
                     data = json.loads(result)
-                    assert data["success"] is True
-                    assert data["data"]["brightness"] == 0
+                    assert data["success"] is False
+                    assert "0-100" in data["error"]["message"]
 
 
 class TestBrightnessControlErrors:

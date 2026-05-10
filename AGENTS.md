@@ -111,12 +111,12 @@ def register_iot_control_tools(mcp):
 
 | Suite | Coverage | What it measures |
 |-------|----------|-----------------|
-| Unit | **100%** (523/523 stmts) | All code paths exercised with mocks |
+| Unit | **>80%** | All code paths exercised with mocks |
 | Integration | **66%** (345/523 stmts) | Real MQTT + nmap + Tasmota devices (read-only) — missing 34% requires destructive ops or OpenBK devices |
 | Smoke | 0% | Tests external server process over HTTP — coverage.py cannot trace |
 | E2E | 0% | Same as smoke — validates response format, not line coverage |
 
-Per-module unit coverage: all 4 modules at 100% (`iot_control.py`, `iot_devices.py`, `iot_discovery.py`, `iot_mqtt.py`).
+Per-module unit coverage: all 4 modules >80% (`iot_control.py`, `iot_devices.py`, `iot_discovery.py`, `iot_mqtt.py`).
 
 ## Code Quality
 
@@ -144,7 +144,9 @@ Error responses must include actionable fields:
 - Never hardcode IP addresses, port numbers, or default values — use `tools/constants.py`.
 
 ### Logging
-- Use `print()` for server startup messages (this is a MCP server, not a library).
+- Use `get_logger("component_name")` from `tools.constants` for all log output.
+- All log output must target stderr via `logging.StreamHandler(sys.stderr)`.
+- Log level is configurable via `LOG_LEVEL` env var (default `INFO`).
 - Use `sys.stderr` for diagnostic output in tests.
 
 ## File Organization
@@ -190,9 +192,9 @@ tasmota-openbk-mcp/
 
 ## Coverage Requirements
 
-- **Per module minimum**: 80% line coverage for each `tools/*.py` file (currently 100%).
-- **Overall**: 80%+ across all Python source files (currently 100%).
-- **New tools**: Must include unit tests covering all paths + exception handlers + registration wrappers.
+- **Per module minimum**: 80% line coverage for each `tools/*.py` file.
+- **Overall**: 80%+ across all Python source files.
+- **New tools**: Must include unit tests covering the success path and the primary error handler, plus exception handlers and registration wrappers.
 - **Critical tools**: `iot_discover_devices`, `iot_set_power`, `iot_mqtt_publish` need unit + integration + smoke tests.
 
 ## CI Pipeline

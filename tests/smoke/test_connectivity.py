@@ -5,10 +5,13 @@ import requests
 
 from .conftest import REST_API_URL, server_is_running
 
-pytestmark = pytest.mark.skipif(
-    not server_is_running(),
-    reason="MCP server not running",
-)
+pytestmark = [
+    pytest.mark.smoke,
+    pytest.mark.skipif(
+        not server_is_running(),
+        reason="MCP server not running",
+    ),
+]
 
 
 class TestHealthConnectivity:

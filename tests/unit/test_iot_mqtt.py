@@ -5,6 +5,8 @@ Unit tests for IoT MCP MQTT tools.
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from tools.iot_mqtt import (
     _get_mqtt_client,
     _mqtt_build_command_topic,
@@ -12,6 +14,8 @@ from tools.iot_mqtt import (
     _mqtt_publish,
     register_iot_mqtt_tools,
 )
+
+pytestmark = pytest.mark.unit
 
 
 class TestGetMqttClient:
@@ -140,7 +144,7 @@ class TestMqttGetState:
             mock_get_client.return_value = mock_client
 
             with patch("tools.iot_mqtt.time.sleep"):
-                result = _mqtt_get_state("test", timeout_sec=1)
+                result = _mqtt_get_state("test", timeout_seconds=1)
                 data = json.loads(result)
 
                 assert data["success"] is True
@@ -163,7 +167,7 @@ class TestMqttGetState:
             mock_get_client.return_value = mock_client
 
             with patch("tools.iot_mqtt.time.sleep"):
-                result = _mqtt_get_state("test", timeout_sec=1)
+                result = _mqtt_get_state("test", timeout_seconds=1)
                 data = json.loads(result)
                 assert data["success"] is False
                 assert "No state message" in data["error"]["message"]
@@ -200,7 +204,7 @@ class TestMqttGetStateErrors:
             mock_client = MagicMock()
             mock_client.connect.side_effect = Exception("Broker unreachable")
             mock_get_client.return_value = mock_client
-            result = _mqtt_get_state("test", timeout_sec=1)
+            result = _mqtt_get_state("test", timeout_seconds=1)
             data = json.loads(result)
             assert data["success"] is False
             assert "Broker unreachable" in data["error"]["message"]
@@ -221,7 +225,7 @@ class TestMqttGetStateErrors:
             mock_get_client.return_value = mock_client
 
             with patch("tools.iot_mqtt.time.sleep"):
-                result = _mqtt_get_state("test", timeout_sec=1)
+                result = _mqtt_get_state("test", timeout_seconds=1)
                 data = json.loads(result)
                 assert data["success"] is True
                 assert data["data"]["state"] == "ON"
@@ -265,7 +269,7 @@ class TestMqttRegistrationWrappers:
             mock_client.loop_start.side_effect = capture_on_message
             mock_get_client.return_value = mock_client
             with patch("tools.iot_mqtt.time.sleep"):
-                result = fn("test", timeout=1)
+                result = fn("test", timeout_seconds=1)
                 data = json.loads(result)
                 assert data["success"] is True
 

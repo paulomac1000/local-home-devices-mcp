@@ -34,6 +34,9 @@ from tools.constants import (
     START_IP,
     TOOL_MANIFESTS,
     TOOLS_VERSION,
+    get_logger,
+    get_tool_counts,
+    setup_logging,
 )
 from tools.iot_control import register_iot_control_tools
 from tools.iot_devices import register_iot_device_tools
@@ -77,7 +80,7 @@ def start_health_server(port: int = 9100) -> HTTPServer:
     """
     server = HTTPServer((BIND_HOST, port), HealthHandler)
     threading.Thread(target=server.serve_forever, daemon=True, name="HealthServer").start()
-    print(f"[health] HTTP health endpoint started on port {port}", file=sys.stderr)
+    get_logger("health").info("HTTP health endpoint started on port %d", port)
     return server
 
 
@@ -148,6 +151,7 @@ def create_rest_app():
                 "server": "IoT-Observer",
                 "version": TOOLS_VERSION,
                 "tools_registered": get_tool_count(),
+                "tool_invocation_counts": get_tool_counts(),
                 "endpoints": {
                     "mcp_sse": f"http://{BIND_HOST}:{MCP_SSE_PORT}/sse",
                     "mcp_messages": f"http://{BIND_HOST}:{MCP_SSE_PORT}/messages",
@@ -289,7 +293,7 @@ def run_rest_api() -> None:
     import uvicorn
 
     app = create_rest_app()
-    print(f"[rest] REST API started on port {REST_API_PORT}", file=sys.stderr)
+    get_logger("rest").info("REST API started on port %d", REST_API_PORT)
     uvicorn.run(app, host=BIND_HOST, port=REST_API_PORT, log_level="warning")
 
 
@@ -297,47 +301,52 @@ def run_rest_api() -> None:
 # MAIN ENTRY POINT
 # =============================================================================
 
-if __name__ == "__main__":
+
+def main() -> None:
+    """Entry point for the IoT MCP server."""
+    setup_logging()
+    logger = get_logger("server")
+
     # Guard: public binding requires explicit confirmation
     if BIND_HOST == "0.0.0.0" and not ALLOW_PUBLIC_BIND:
-        print(
-            "[CRITICAL] Binding to 0.0.0.0 without ALLOW_PUBLIC_BIND=1. "
-            "Set ALLOW_PUBLIC_BIND=1 to confirm.",
-            file=sys.stderr,
+        logger.critical(
+            "Binding to 0.0.0.0 without MCP_UNSAFE_PUBLIC_ACCESS_CONFIRMED=1. "
+            "Set MCP_UNSAFE_PUBLIC_ACCESS_CONFIRMED=1 to confirm."
         )
         sys.exit(1)
     if BIND_HOST == "0.0.0.0":
-        print(
-            "[CRITICAL] Server bound to 0.0.0.0 — tools are exposed to the network.",
-            file=sys.stderr,
-        )
+        logger.critical("Server bound to 0.0.0.0 — tools are exposed to the network.")
 
     # 1. Start health check server (port 9100)
     start_health_server(port=HEALTH_CHECK_PORT)
     HEALTH_STATE["status"] = "healthy"
     HEALTH_STATE["last_heartbeat"] = time.time()
 
-    print("[server] " + "=" * 50, file=sys.stderr)
-    print("[server] IoT-Observer MCP Server", file=sys.stderr)
-    print("[server] " + "=" * 50, file=sys.stderr)
-    print(f"[server] MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}", file=sys.stderr)
-    print(f"[server] Network Range: {START_IP} - {END_IP}", file=sys.stderr)
-    print(f"[server] Scan CIDR: {DEFAULT_NETWORK_RANGE}", file=sys.stderr)
-    print("[server] Device Cache: /app/data/discovered_devices.json", file=sys.stderr)
-    print(f"[server] Registered tools: {tool_count}", file=sys.stderr)
-    print("[server] " + "-" * 50, file=sys.stderr)
+    logger.info("=" * 50)
+    logger.info("IoT-Observer MCP Server")
+    logger.info("=" * 50)
+    logger.info("MQTT Broker: %s:%s", MQTT_BROKER, MQTT_PORT)
+    logger.info("Network Range: %s - %s", START_IP, END_IP)
+    logger.info("Scan CIDR: %s", DEFAULT_NETWORK_RANGE)
+    logger.info("Device Cache: /app/data/discovered_devices.json")
+    logger.info("Registered tools: %d", tool_count)
+    logger.info("-" * 50)
 
     # 2. Start REST API in a separate thread (port 9102)
     rest_thread = threading.Thread(target=run_rest_api, daemon=True, name="RestAPI")
     rest_thread.start()
 
-    print("[server] Endpoints:", file=sys.stderr)
-    print(f"[server]   Health:      http://{BIND_HOST}:{HEALTH_CHECK_PORT}/health", file=sys.stderr)
-    print(f"[server]   MCP SSE:     http://{BIND_HOST}:{MCP_SSE_PORT}/sse", file=sys.stderr)
-    print(f"[server]   MCP MSG:     http://{BIND_HOST}:{MCP_SSE_PORT}/messages", file=sys.stderr)
-    print(f"[server]   REST API:    http://{BIND_HOST}:{REST_API_PORT}/api/", file=sys.stderr)
-    print("[server] " + "=" * 50, file=sys.stderr)
+    logger.info("Endpoints:")
+    logger.info("  Health:      http://%s:%s/health", BIND_HOST, HEALTH_CHECK_PORT)
+    logger.info("  MCP SSE:     http://%s:%s/sse", BIND_HOST, MCP_SSE_PORT)
+    logger.info("  MCP MSG:     http://%s:%s/messages", BIND_HOST, MCP_SSE_PORT)
+    logger.info("  REST API:    http://%s:%s/api/", BIND_HOST, REST_API_PORT)
+    logger.info("=" * 50)
 
     # 3. Start MCP SSE server (port 9101) - BLOCKING!
-    print(f"[server] Starting MCP SSE transport on port {MCP_SSE_PORT}...", file=sys.stderr)
+    logger.info("Starting MCP SSE transport on port %s...", MCP_SSE_PORT)
     mcp.run(transport="sse", host=BIND_HOST, port=MCP_SSE_PORT)
+
+
+if __name__ == "__main__":
+    main()

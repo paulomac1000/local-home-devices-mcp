@@ -5,10 +5,13 @@ import os
 
 import pytest
 
-pytestmark = pytest.mark.skipif(
-    not bool(os.getenv("MQTT_BROKER")),
-    reason="MQTT_BROKER not configured — skipping integration tests",
-)
+pytestmark = [
+    pytest.mark.integration,
+    pytest.mark.skipif(
+        not bool(os.getenv("MQTT_BROKER")),
+        reason="MQTT_BROKER not configured — skipping integration tests",
+    ),
+]
 
 
 def _get_result(mcp_client, tool_name, **kwargs):

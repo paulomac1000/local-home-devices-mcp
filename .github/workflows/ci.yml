@@ -28,7 +28,7 @@ jobs:
         run: ruff format --check .
 
       - name: Run mypy
-        run: pip install mypy types-requests && mypy tools/ --ignore-missing-imports || true
+        run: pip install mypy types-requests && mypy tools/ --ignore-missing-imports
 
       - name: Run bandit
         run: pip install bandit && bandit -r tools/ -ll || true

@@ -1,3 +1,4 @@
+# mypy: disable-error-code="untyped-decorator"
 """
 IoT Device Discovery Tools
 
@@ -11,12 +12,19 @@ import json
 import os
 import re
 import subprocess
+import threading
 import time
 from typing import Any
 
 import requests
 
-from tools.constants import DEFAULT_NETWORK_RANGE, _error, _success
+from tools.constants import (
+    DEFAULT_NETWORK_RANGE,
+    _error_response_extended,
+    _success_response,
+    increment_tool_count,
+    start_tool_context,
+)
 
 # =============================================================================
 # CACHE CONFIGURATION
@@ -25,6 +33,7 @@ from tools.constants import DEFAULT_NETWORK_RANGE, _error, _success
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 CACHE_FILE = os.path.join(DATA_DIR, "discovered_devices.json")
 CACHE_TTL_SECONDS = 3600  # 1 hour
+_cache_lock = threading.Lock()
 
 __all__ = [
     "register_iot_discovery_tools",
@@ -51,14 +60,18 @@ def _load_cache() -> dict[str, Any]:
         Dictionary with devices list, last_scan timestamp and version.
         Returns empty structure if cache does not exist or is corrupted.
     """
-    _ensure_data_dir()
-    if not os.path.exists(CACHE_FILE):
-        return {"devices": [], "last_scan": None, "version": 1}
-    try:
-        with open(CACHE_FILE, encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return {"devices": [], "last_scan": None, "version": 1}
+    with _cache_lock:
+        _ensure_data_dir()
+        if not os.path.exists(CACHE_FILE):
+            return {"devices": [], "last_scan": None, "version": 1}
+        try:
+            with open(CACHE_FILE, encoding="utf-8") as f:
+                result: Any = json.load(f)
+                if not isinstance(result, dict):
+                    return {"devices": [], "last_scan": None, "version": 1}
+                return result
+        except (json.JSONDecodeError, OSError):
+            return {"devices": [], "last_scan": None, "version": 1}
 
 
 def _save_cache(devices: list[dict[str, Any]]) -> None:
@@ -67,21 +80,25 @@ def _save_cache(devices: list[dict[str, Any]]) -> None:
     Args:
         devices: List of device dictionaries to persist.
     """
-    _ensure_data_dir()
-    cache = {
-        "version": 1,
-        "last_scan": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "device_count": len(devices),
-        "devices": devices,
-    }
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(cache, f, indent=2, ensure_ascii=False)
+    with _cache_lock:
+        _ensure_data_dir()
+        cache = {
+            "version": 1,
+            "last_scan": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "device_count": len(devices),
+            "devices": devices,
+        }
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(cache, f, indent=2, ensure_ascii=False)
 
 
 def _get_cached_devices() -> list[dict[str, Any]]:
     """Return list of cached devices."""
     cache = _load_cache()
-    return cache.get("devices", [])
+    devices = cache.get("devices", [])
+    if not isinstance(devices, list):
+        return []
+    return devices
 
 
 def _is_cache_fresh() -> bool:
@@ -292,6 +309,7 @@ def _scan_network(network_range: str, timeout: int = 5) -> list[str]:
     """
     del timeout  # nmap has its own timeout handling
     try:
+        # TODO: [L3] Check cancellation signal before starting nmap
         result = subprocess.run(
             ["nmap", "-sn", "-oG", "-", network_range],
             capture_output=True,
@@ -321,12 +339,12 @@ def _scan_network(network_range: str, timeout: int = 5) -> list[str]:
 # =============================================================================
 
 
-def _iot_discover_devices(network_range: str | None = None, timeout: int = 5) -> str:
+def _iot_discover_devices(network_range: str | None = None, timeout_seconds: int = 10) -> str:
     """Discover OpenBK and Tasmota devices on the network using nmap.
 
     Args:
         network_range: CIDR range to scan (defaults to NETWORK_RANGE env or 192.168.0.0/24).
-        timeout: Timeout per device probe in seconds.
+        timeout_seconds: Timeout per device probe in seconds.
 
     Returns:
         JSON string with discovered devices list and scan summary.
@@ -334,25 +352,23 @@ def _iot_discover_devices(network_range: str | None = None, timeout: int = 5) ->
     if network_range is None:
         network_range = DEFAULT_NETWORK_RANGE
     try:
-        alive_ips = _scan_network(network_range, timeout)
+        alive_ips = _scan_network(network_range, timeout_seconds)
 
         if not alive_ips:
-            return json.dumps(
-                _success(
-                    {
-                        "total_found": 0,
-                        "scanned_ips": 0,
-                        "note": "No alive hosts found in the network range",
-                    }
-                ),
-                indent=2,
+            return _success_response(
+                {
+                    "total_found": 0,
+                    "scanned_ips": 0,
+                    "note": "No alive hosts found in the network range",
+                }
             )
 
         devices: list[dict[str, Any]] = []
         for ip in alive_ips:
-            device_type = _detect_device_type(ip, timeout)
+            # TODO: [L3] Check cancellation signal here for long scans
+            device_type = _detect_device_type(ip, timeout_seconds)
             if device_type:
-                info = _probe_device_info(ip, device_type, timeout)
+                info = _probe_device_info(ip, device_type, timeout_seconds)
                 if info["reachable"]:
                     devices.append(info)
 
@@ -369,25 +385,21 @@ def _iot_discover_devices(network_range: str | None = None, timeout: int = 5) ->
                 }
             )
 
-        return json.dumps(
-            _success(
-                {
-                    "total_found": len(devices),
-                    "scanned_ips": len(alive_ips),
-                    "network_range": network_range,
-                    "cache_file": CACHE_FILE,
-                    "by_type": by_type,
-                    "devices": devices,
-                }
-            ),
-            indent=2,
-            ensure_ascii=False,
+        return _success_response(
+            {
+                "total_found": len(devices),
+                "scanned_ips": len(alive_ips),
+                "network_range": network_range,
+                "cache_file": CACHE_FILE,
+                "by_type": by_type,
+                "devices": devices,
+            }
         )
 
     except RuntimeError as exc:
-        return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
     except Exception as exc:
-        return json.dumps(_error(f"Discovery failed: {exc}", code="INTERNAL_ERROR"), indent=2)
+        return _error_response_extended(code="INTERNAL_ERROR", message=f"Discovery failed: {exc}")
 
 
 def _iot_list_devices() -> str:
@@ -401,18 +413,15 @@ def _iot_list_devices() -> str:
         devices = cache.get("devices", [])
 
         if not devices:
-            return json.dumps(
-                _success(
-                    {
-                        "device_count": 0,
-                        "cached": False,
-                        "suggestion": (
-                            "No devices in cache. Run iot_discover_devices() to scan the network."
-                        ),
-                        "devices": [],
-                    }
-                ),
-                indent=2,
+            return _success_response(
+                {
+                    "device_count": 0,
+                    "cached": False,
+                    "suggestion": (
+                        "No devices in cache. Run iot_discover_devices() to scan the network."
+                    ),
+                    "devices": [],
+                }
             )
 
         summary = [
@@ -426,59 +435,49 @@ def _iot_list_devices() -> str:
             for d in devices
         ]
 
-        return json.dumps(
-            _success(
-                {
-                    "device_count": len(devices),
-                    "cached": True,
-                    "last_scan": cache.get("last_scan"),
-                    "cache_file": CACHE_FILE,
-                    "cache_fresh": _is_cache_fresh(),
-                    "devices": summary,
-                }
-            ),
-            indent=2,
-            ensure_ascii=False,
+        return _success_response(
+            {
+                "device_count": len(devices),
+                "cached": True,
+                "last_scan": cache.get("last_scan"),
+                "cache_file": CACHE_FILE,
+                "cache_fresh": _is_cache_fresh(),
+                "devices": summary,
+            }
         )
 
     except Exception as exc:
-        return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
 
-def _iot_check_device(ip_address: str) -> str:
+def _iot_check_device(ip_address: str, timeout_seconds: int = 10) -> str:
     """Check if a specific IP is an IoT device and identify its type.
 
     Args:
         ip_address: IP address to check.
+        timeout_seconds: Request timeout in seconds.
 
     Returns:
         JSON string with device identification.
     """
     try:
-        device_type = _detect_device_type(ip_address)
+        device_type = _detect_device_type(ip_address, timeout_seconds)
 
         if not device_type:
-            return json.dumps(
-                _success(
-                    {
-                        "is_iot_device": False,
-                        "ip": ip_address,
-                        "note": "No OpenBK or Tasmota device detected at this IP",
-                    }
-                ),
-                indent=2,
+            return _success_response(
+                {
+                    "is_iot_device": False,
+                    "ip": ip_address,
+                    "note": "No OpenBK or Tasmota device detected at this IP",
+                }
             )
 
-        info = _probe_device_info(ip_address, device_type)
+        info = _probe_device_info(ip_address, device_type, timeout_seconds)
 
-        return json.dumps(
-            _success({"is_iot_device": True, "device": info}),
-            indent=2,
-            ensure_ascii=False,
-        )
+        return _success_response({"is_iot_device": True, "device": info})
 
     except Exception as exc:
-        return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
 
 def _iot_find_device_by_name(name: str) -> str:
@@ -494,22 +493,19 @@ def _iot_find_device_by_name(name: str) -> str:
         device = _find_device_by_identifier(name)
 
         if not device:
-            return json.dumps(
-                _error(
-                    f"Device '{name}' not found in cache",
-                    code="NAME_NOT_RESOLVED",
-                    suggestion=(
-                        "Run iot_discover_devices() first, or check "
-                        "iot_list_devices() for available names"
-                    ),
+            return _error_response_extended(
+                code="NAME_NOT_RESOLVED",
+                message=f"Device '{name}' not found in cache",
+                suggestion=(
+                    "Run iot_discover_devices() first, or check "
+                    "iot_list_devices() for available names"
                 ),
-                indent=2,
             )
 
-        return json.dumps(_success({"device": device}), indent=2, ensure_ascii=False)
+        return _success_response({"device": device})
 
     except Exception as exc:
-        return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
 
 # =============================================================================
@@ -517,68 +513,85 @@ def _iot_find_device_by_name(name: str) -> str:
 # =============================================================================
 
 
-def register_iot_discovery_tools(mcp) -> None:
+def register_iot_discovery_tools(mcp: Any) -> None:
     """Register IoT device discovery tools with the MCP server."""
 
     @mcp.tool()
-    def iot_discover_devices(network_range: str | None = None, timeout: int = 5) -> str:
-        """[READ] Discover OpenBK and Tasmota devices on the network using nmap.
+    def iot_discover_devices(network_range: str | None = None, timeout_seconds: int = 10) -> str:
+        """Discover OpenBK and Tasmota devices on the network using nmap.
 
         Results are saved to a local cache file for fast lookups.
         The default scan range is configured via NETWORK_RANGE, START_IP, and END_IP env vars.
 
         Args:
             network_range: CIDR range to scan (e.g. "192.168.0.0/24"). Uses env default if not set.
-            timeout: Timeout per device probe in seconds (default 5).
+            timeout_seconds: Timeout per device probe in seconds (default 10).
 
         Returns:
             JSON with discovered devices list and scan summary.
+
+        @since v1.2.0
         """
         try:
-            return _iot_discover_devices(network_range, timeout)
+            start_tool_context()
+            increment_tool_count("iot_discover_devices")
+            return _iot_discover_devices(network_range, timeout_seconds)
         except Exception as exc:
-            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
     def iot_list_devices() -> str:
-        """[READ] List all discovered IoT devices from the local cache.
+        """List all discovered IoT devices from the local cache.
 
         If the cache is empty, suggests running iot_discover_devices first.
 
         Returns:
             JSON with cached devices or suggestion to run discovery.
+
+        @since v1.2.0
         """
         try:
+            start_tool_context()
+            increment_tool_count("iot_list_devices")
             return _iot_list_devices()
         except Exception as exc:
-            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
-    def iot_check_device(ip_address: str) -> str:
-        """[READ] Check if a specific IP is an IoT device and identify its type.
+    def iot_check_device(ip_address: str, timeout_seconds: int = 10) -> str:
+        """Check if a specific IP is an IoT device and identify its type.
 
         Args:
             ip_address: IP address to check.
+            timeout_seconds: Request timeout in seconds (default 10).
 
         Returns:
             JSON with device identification.
+
+        @since v1.2.0
         """
         try:
-            return _iot_check_device(ip_address)
+            start_tool_context()
+            increment_tool_count("iot_check_device")
+            return _iot_check_device(ip_address, timeout_seconds)
         except Exception as exc:
-            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
     def iot_find_device_by_name(name: str) -> str:
-        """[READ] Find a device in the cache by its friendly name (partial match).
+        """Find a device in the cache by its friendly name (partial match).
 
         Args:
             name: Device name or part of it (case-insensitive).
 
         Returns:
             JSON with matching device or error if not found.
+
+        @since v1.2.0
         """
         try:
+            start_tool_context()
+            increment_tool_count("iot_find_device_by_name")
             return _iot_find_device_by_name(name)
         except Exception as exc:
-            return json.dumps(_error(str(exc), code="INTERNAL_ERROR"), indent=2)
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
