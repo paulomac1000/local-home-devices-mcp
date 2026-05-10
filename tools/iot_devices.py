@@ -15,6 +15,7 @@ from tools.constants import (
     _error_response_extended,
     _success_response,
     increment_tool_count,
+    inject_tool_risk_prefix,
     start_tool_context,
 )
 
@@ -276,6 +277,7 @@ def register_iot_device_tools(mcp: Any) -> None:
     """Register IoT device information tools with the MCP server."""
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_get_device_info(identifier: str, timeout_seconds: int = 10) -> str:
         """Get detailed information about an IoT device.
 
@@ -298,6 +300,7 @@ def register_iot_device_tools(mcp: Any) -> None:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_get_device_power(identifier: str, channel: int = 1, timeout_seconds: int = 10) -> str:
         """Get power state of a specific channel on an IoT device.
 

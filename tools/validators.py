@@ -92,3 +92,34 @@ def validate_ip_format(ip: str) -> str:
     if not re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", ip.strip()):
         raise ValidationError(f"Invalid IP address format: {ip}")
     return ip.strip()
+
+
+_CIDR_RE = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/(\d{1,2})$")
+
+
+def validate_cidr(cidr: str | None) -> str:
+    """Validate a CIDR notation network range.
+
+    Args:
+        cidr: CIDR string (e.g. "192.168.0.0/24") or None.
+
+    Returns:
+        The trimmed CIDR string.
+
+    Raises:
+        ValidationError: If CIDR is None, empty, or does not match valid format.
+    """
+    if not cidr or not cidr.strip():
+        raise ValidationError("Network range is required")
+    cidr = cidr.strip()
+    m = _CIDR_RE.match(cidr)
+    if not m:
+        raise ValidationError(f"Invalid CIDR notation: {cidr!r}. Expected format: 192.168.0.0/24")
+    prefix = int(m.group(1))
+    if not 0 <= prefix <= 32:
+        raise ValidationError(f"Invalid CIDR prefix length: {prefix}. Must be 0-32")
+    octets = cidr.split("/")[0].split(".")
+    for octet in octets:
+        if not 0 <= int(octet) <= 255:
+            raise ValidationError(f"Invalid IP octet in CIDR: {cidr!r}. Each octet must be 0-255")
+    return cidr

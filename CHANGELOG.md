@@ -14,6 +14,9 @@ All notable changes to this project.
 - `tests/e2e/` — full pipeline E2E test suite (6 REST API endpoint tests)
 - `AGENTS.md` — comprehensive agent instructions aligned with ha-mcp-readonly standards
 - `CHANGELOG.md` — this file
+- `tools/validators.py` — centralized input validation module (`ValidationError`, `validate_power_state`, `validate_brightness`, `validate_ip_format`, `validate_cidr`)
+- Dynamic risk prefix injection — `inject_tool_risk_prefix()` decorator injects `[READ]`/`[WRITE]`/`[DANGEROUS]` from `TOOL_MANIFESTS` into all 13 tool docstrings
+- Log sanitization — `sanitize_log_line()` and `SanitizingFormatter` redact Bearer tokens, passwords, and IP addresses from log output
 - CI smoke-test Docker job — starts container, curls health/tools endpoints, stops container
 - Dynamic skip pattern for smoke/e2e tests — socket-based server detection instead of hardcoded `True`
 - 70 new unit tests across all modules — 130 total, 100% line coverage
@@ -33,6 +36,8 @@ All notable changes to this project.
 - `brief.md` — development planning document, no longer needed
 
 ### Fixed
+- Missing `HEALTH_CHECK_PORT` and `LOG_LEVEL` in `.env.example`
+- Missing CIDR validation for `network_range` parameter before nmap scan
 - Duplicated IP/port defaults across `server.py`, `iot_mqtt.py`, `iot_discovery.py`
 - Production Docker image containing development-only test files
 - 0% coverage on MCP tool registration wrappers and exception handlers (now 100%)
@@ -46,10 +51,6 @@ All notable changes to this project.
 | Integration | 66% (345/523 stmts) | 20 |
 | Smoke | 0% (external process) | 17 |
 | E2E | 0% (external process) | 6 |
-
-## [1.1.0] — earlier release
-- Initial MCP tool set
-- Basic unit test suite
 
 ## [1.0.0] — initial release
 - 13 MCP tools across 4 categories

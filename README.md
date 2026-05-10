@@ -104,36 +104,40 @@ curl -X POST http://localhost:9102/api/tools/iot_list_devices \
 
 ### Device Discovery
 
-| Tool | Description |
-|------|-------------|
-| `iot_discover_devices` | Scan local network for OpenBK and Tasmota devices |
-| `iot_list_devices` | List all previously discovered devices from cache |
-| `iot_check_device` | Quick connectivity and status check for a specific IP |
-| `iot_find_device_by_name` | Find a device by its friendly name |
+All read-only operations — no device state is modified.
+
+| Tool | Risk | Description |
+|------|------|-------------|
+| `iot_discover_devices` | [READ] | Scan local network for OpenBK and Tasmota devices |
+| `iot_list_devices` | [READ] | List all previously discovered devices from cache |
+| `iot_check_device` | [READ] | Quick connectivity and status check for a specific IP |
+| `iot_find_device_by_name` | [READ] | Find a device by its friendly name |
 
 ### Device Information
 
-| Tool | Description |
-|------|-------------|
-| `iot_get_device_info` | Full device information (name, firmware, chip type, etc.) |
-| `iot_get_device_power` | Current power state of a specific channel |
-| `iot_get_wifi_config` | WiFi SSID, RSSI signal strength, MAC, IP address |
+All read-only operations — no device state is modified.
+
+| Tool | Risk | Description |
+|------|------|-------------|
+| `iot_get_device_info` | [READ] | Full device information (name, firmware, chip type, etc.) |
+| `iot_get_device_power` | [READ] | Current power state of a specific channel |
+| `iot_get_wifi_config` | [READ] | WiFi SSID, RSSI signal strength, MAC, IP address |
 
 ### Device Control
 
-| Tool | Description |
-|------|-------------|
-| `iot_set_power` | Turn a channel ON, OFF, or TOGGLE |
-| `iot_set_brightness` | Set brightness level (0-100%) |
-| `iot_restart_device` | Restart the device |
+| Tool | Risk | Description |
+|------|------|-------------|
+| `iot_set_power` | [WRITE] | Turn a channel ON, OFF, or TOGGLE |
+| `iot_set_brightness` | [WRITE] | Set brightness level (0-100%) |
+| `iot_restart_device` | [DANGEROUS] | Restart the device (temporarily disconnects) |
 
 ### MQTT Integration
 
-| Tool | Description |
-|------|-------------|
-| `iot_mqtt_publish` | Publish a command via MQTT |
-| `iot_mqtt_get_state` | Get device state from MQTT broker |
-| `iot_mqtt_build_command_topic` | Build MQTT command topic for a device |
+| Tool | Risk | Description |
+|------|------|-------------|
+| `iot_mqtt_publish` | [WRITE] | Publish a command via MQTT |
+| `iot_mqtt_get_state` | [READ] | Get device state from MQTT broker |
+| `iot_mqtt_build_command_topic` | [READ] | Build MQTT command topic for a device |
 
 ## Configuration
 
@@ -193,12 +197,14 @@ The project has a 4-tier test hierarchy (see `AGENTS.md` for details):
 
 | Suite | Tests | Coverage | Command |
 |-------|-------|----------|---------|
-| Unit | 130 | **100%** | `pytest tests/unit/ -v --tb=short` |
+| Unit | 183 | **>80%** | `pytest tests/unit/ -v --tb=short` |
 | Integration | 20 | **66%** | `pytest tests/integration/ -q` |
 | Smoke | 17 | HTTP validation | `pytest tests/smoke/ -q` |
 | E2E | 6 | HTTP validation | `pytest tests/e2e/ -q` |
 
 Unit tests run in CI. Integration, smoke, and e2e tests skip when their dependencies (MQTT broker, running server) are absent.
+
+The server follows the `mcp_standards.md` conventions at L2/L3 maturity level. All tools return structured JSON with a `success` field, use extended error codes (`TIMEOUT`, `NAME_NOT_RESOLVED`, `DEVICE_NOT_FOUND`, `INTERNAL_ERROR`), and expose capability manifests via `/api/tools/{name}/manifest`.
 
 ## Claude Desktop Configuration
 

@@ -14,6 +14,7 @@ from tools.constants import (
     _error_response_extended,
     _success_response,
     increment_tool_count,
+    inject_tool_risk_prefix,
     start_tool_context,
 )
 from tools.validators import validate_brightness, validate_power_state
@@ -311,6 +312,7 @@ def register_iot_control_tools(mcp: Any) -> None:
     """Register IoT device control tools with the MCP server."""
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_set_power(
         identifier: str, state: str, channel: int = 1, timeout_seconds: int = 10
     ) -> str:
@@ -337,6 +339,7 @@ def register_iot_control_tools(mcp: Any) -> None:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_set_brightness(
         identifier: str, brightness: int, channel: int = 1, timeout_seconds: int = 10
     ) -> str:
@@ -363,6 +366,7 @@ def register_iot_control_tools(mcp: Any) -> None:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_restart_device(identifier: str, timeout_seconds: int = 10) -> str:
         """Restart an IoT device.
 
@@ -387,6 +391,7 @@ def register_iot_control_tools(mcp: Any) -> None:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_get_wifi_config(identifier: str, timeout_seconds: int = 10) -> str:
         """Get WiFi configuration from an IoT device.
 

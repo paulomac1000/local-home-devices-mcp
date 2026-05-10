@@ -16,6 +16,7 @@ from tools.constants import (
     _error_response_extended,
     _success_response,
     increment_tool_count,
+    inject_tool_risk_prefix,
     start_tool_context,
 )
 
@@ -186,6 +187,7 @@ def register_iot_mqtt_tools(mcp: Any) -> None:
     """Register IoT MQTT tools with the MCP server."""
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_mqtt_publish(
         topic: str, payload: str, retain: bool = False, timeout_seconds: int = 10
     ) -> str:
@@ -210,6 +212,7 @@ def register_iot_mqtt_tools(mcp: Any) -> None:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_mqtt_get_state(topic_prefix: str, timeout_seconds: int = 10) -> str:
         """Get current state of a device via MQTT.
 
@@ -232,6 +235,7 @@ def register_iot_mqtt_tools(mcp: Any) -> None:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_mqtt_build_command_topic(device_name: str, command: str = "Power") -> str:
         """Build MQTT command topic for a device.
 

@@ -62,6 +62,30 @@ def get_tool_counts() -> dict[str, int]:
 _LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 _LOGGER_INITIALIZED = False
 
+_SENSITIVE_PATTERNS = [
+    (r"Bearer\s+[A-Za-z0-9\-._~+/]+=*", "Bearer <REDACTED>"),
+    (r"Authorization:\s*[^\s]+", "Authorization: <REDACTED>"),
+    (r"password[=:]\s*[^\s&]+", "password=<REDACTED>"),
+    (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "<IP_REDACTED>"),
+]
+
+
+def sanitize_log_line(line: str) -> str:
+    """Remove sensitive data from a log line.
+
+    Args:
+        line: Raw log line that may contain credentials or tokens.
+
+    Returns:
+        Sanitized line with sensitive patterns replaced by REDACTED markers.
+    """
+    import re
+
+    for pattern, replacement in _SENSITIVE_PATTERNS:
+        line = re.sub(pattern, replacement, line, flags=re.IGNORECASE)
+    return line
+
+
 _request_id_context = threading.local()
 
 
@@ -116,8 +140,13 @@ def setup_logging() -> None:
     logger = logging.getLogger("iot_mcp")
     logger.setLevel(getattr(logging, _LOG_LEVEL, logging.INFO))
     handler = logging.StreamHandler(sys.stderr)
+
+    class SanitizingFormatter(logging.Formatter):
+        def format(self, record: logging.LogRecord) -> str:
+            return sanitize_log_line(super().format(record))
+
     handler.setFormatter(
-        logging.Formatter(
+        SanitizingFormatter(
             "%(asctime)s [%(levelname)s] [%(request_id)s] %(name)s: %(message)s",
             datefmt="%Y-%m-%d %H:%M:%S",
         )
@@ -479,3 +508,22 @@ def get_tool_manifest(tool_name: str) -> dict[str, Any] | None:
         Manifest dict or None if tool not found.
     """
     return TOOL_MANIFESTS.get(tool_name)
+
+
+def inject_tool_risk_prefix(func):
+    """Inject [READ]/[WRITE]/[DANGEROUS] risk prefix from TOOL_MANIFESTS into func.__doc__.
+
+    The prefix is prepended only if the docstring does not already start with '['.
+
+    Args:
+        func: The tool function being decorated.
+
+    Returns:
+        The same function with an updated __doc__.
+    """
+    manifest = TOOL_MANIFESTS.get(func.__name__)
+    if manifest:
+        doc = (func.__doc__ or "").strip()
+        if doc and not doc.startswith("["):
+            func.__doc__ = f"[{manifest['risk']}] {doc}"
+    return func

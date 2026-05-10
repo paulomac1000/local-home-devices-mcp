@@ -23,8 +23,10 @@ from tools.constants import (
     _error_response_extended,
     _success_response,
     increment_tool_count,
+    inject_tool_risk_prefix,
     start_tool_context,
 )
+from tools.validators import validate_cidr
 
 # =============================================================================
 # CACHE CONFIGURATION
@@ -309,6 +311,7 @@ def _scan_network(network_range: str, timeout: int = 5) -> list[str]:
     """
     del timeout  # nmap has its own timeout handling
     try:
+        network_range = validate_cidr(network_range)
         # TODO: [L3] Check cancellation signal before starting nmap
         result = subprocess.run(
             ["nmap", "-sn", "-oG", "-", network_range],
@@ -517,6 +520,7 @@ def register_iot_discovery_tools(mcp: Any) -> None:
     """Register IoT device discovery tools with the MCP server."""
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_discover_devices(network_range: str | None = None, timeout_seconds: int = 10) -> str:
         """Discover OpenBK and Tasmota devices on the network using nmap.
 
@@ -540,6 +544,7 @@ def register_iot_discovery_tools(mcp: Any) -> None:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_list_devices() -> str:
         """List all discovered IoT devices from the local cache.
 
@@ -558,6 +563,7 @@ def register_iot_discovery_tools(mcp: Any) -> None:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_check_device(ip_address: str, timeout_seconds: int = 10) -> str:
         """Check if a specific IP is an IoT device and identify its type.
 
@@ -578,6 +584,7 @@ def register_iot_discovery_tools(mcp: Any) -> None:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_find_device_by_name(name: str) -> str:
         """Find a device in the cache by its friendly name (partial match).
 
