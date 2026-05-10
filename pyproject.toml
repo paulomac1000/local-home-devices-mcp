@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tasmota-openbk-mcp"
+version = "1.2.0"
+description = "MCP server for IoT device management — OpenBK and Tasmota"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=2.0.0,<3.0.0",
+    "requests>=2.28.0",
+    "starlette>=0.27.0",
+    "uvicorn>=0.22.0",
+    "python-dateutil>=2.8.0",
+    "pydantic>=2.0.0,<3.0.0",
+]
+
+[project.optional-dependencies]
+mqtt = [
+    "paho-mqtt>=1.6.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-mock>=3.10.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.5.0",
+    "bandit>=1.7.0",
+]
+
+[project.scripts]
+tasmota-openbk-mcp = "server:main"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "UP"]
+
+[tool.mypy]
+strict = true
+python_version = "3.11"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "unit: Unit tests (fast, mocked, zero I/O)",
+    "integration: Integration tests (slow, requires real MQTT broker and devices)",
+    "smoke: Smoke tests (quick health check, requires local MCP server)",
+    "e2e: End-to-end tests (full pipeline, requires local MCP server)",
+]
+
+[tool.coverage.run]
+source = ["tools"]
+
+[tool.coverage.report]
+fail_under = 80
+exclude_lines = [
+    "pragma: no cover",
+    "if __name__ == .__main__.:",
+]

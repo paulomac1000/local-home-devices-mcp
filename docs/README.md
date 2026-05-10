@@ -120,8 +120,6 @@ All configuration via environment variables. See `.env.example` for a complete t
 | `MQTT_PASSWORD` | — | MQTT password (if authentication enabled) |
 | `MCP_SSE_PORT` | `9101` | MCP SSE transport port |
 | `REST_API_PORT` | `9102` | REST API port |
-| `IOT_SCAN_ENABLED` | `1` | Enable automatic device discovery on startup |
-| `IOT_DATA_PATH` | `/app/data` | Persistent directory for device cache |
 
 ---
 
@@ -212,19 +210,39 @@ curl -X POST http://localhost:9102/api/tools/iot_discover_devices \
 
 ### Unit Tests
 
-No real devices required — all HTTP and MQTT calls are mocked.
+No real devices required — all HTTP and MQTT calls are mocked. Runs in CI.
 
 ```bash
 pytest tests/unit/ -v --tb=short
+# 130 tests, 100% line coverage
+```
+
+### Smoke Tests
+
+Direct REST API calls to a running MCP server. Skips if server is not running (dynamic socket check).
+
+```bash
+pytest tests/smoke/ -q
+# 17 tests — health, tools list, critical tools, response format
 ```
 
 ### Integration Tests
 
-Requires real devices on the local network:
+Real MQTT broker and network scans against real devices. Skips if `MQTT_BROKER` is not configured.
 
 ```bash
 export MQTT_BROKER=192.168.0.101
 pytest tests/integration/ -v
+# 20 tests — discovery, device info, MQTT operations, real Tasmota devices
+```
+
+### E2E Tests
+
+Full REST API pipeline. Skips if server is not running (dynamic socket check).
+
+```bash
+pytest tests/e2e/ -q
+# 6 tests — health, tools list, tool calls, error responses
 ```
 
 ---
@@ -240,15 +258,22 @@ pytest tests/integration/ -v
 ├── Dockerfile             # Container image
 ├── docker-compose.yml     # Quick start
 ├── .env.example           # Configuration template
+├── CHANGELOG.md           # Version history
+├── AGENTS.md              # Agent instructions
 ├── tools/
+│   ├── constants.py       # Shared configuration defaults
 │   ├── iot_discovery.py   # Network scanning and detection
 │   ├── iot_devices.py     # Device info and status
 │   ├── iot_control.py     # Device control (power, brightness)
 │   ├── iot_mqtt.py        # MQTT integration
 │   └── __init__.py
 ├── tests/
-│   ├── unit/              # Unit tests
-│   ├── integration/       # Integration tests
+│   ├── conftest.py        # Env loading only
+│   ├── fixtures.py        # Mock data constants
+│   ├── unit/              # Unit tests (zero I/O, 130 tests)
+│   ├── smoke/             # REST API smoke tests (17 tests)
+│   ├── integration/       # Real MQTT/device tests (20 tests)
+│   ├── e2e/               # Full pipeline tests (6 tests)
 │   └── __init__.py
 └── docs/
     └── README.md          # This documentation
@@ -320,9 +345,8 @@ Detection is automatic based on HTTP response patterns.
 ### Devices not discovered
 
 1. Ensure devices are on the same network as the server
-2. Check `IOT_SCAN_ENABLED=1` in `.env`
-3. Verify devices respond to HTTP on port 80
-4. Try manual check: `curl http://{device_ip}/cm?cmnd=Status`
+2. Verify nmap is installed: `docker exec tasmota-openbk-mcp nmap --version`
+3. Try manual check: `curl http://{device_ip}/cm?cmnd=Status`
 5. **nmap permission issues**: If running locally (not in Docker), nmap may require root. Try: `sudo nmap -sn 192.168.0.0/24`
 
 ### nmap scan fails or returns no hosts

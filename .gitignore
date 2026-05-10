@@ -45,6 +45,8 @@ env/
 htmlcov/
 .tox/
 .nox/
+.ruff_cache/
+.mypy_cache/
 
 # Logs
 *.log
