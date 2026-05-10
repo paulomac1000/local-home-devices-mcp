@@ -1,3 +1,4 @@
+# mypy: disable-error-code="untyped-decorator"
 """
 IoT MQTT Integration Tools
 
@@ -7,17 +8,25 @@ Interact with IoT devices via MQTT broker.
 import json
 import os
 import time
-from typing import Dict
+from typing import Any
+
+from tools.constants import (
+    MQTT_BROKER,
+    MQTT_PORT,
+    _error_response_extended,
+    _success_response,
+    increment_tool_count,
+    inject_tool_risk_prefix,
+    start_tool_context,
+)
 
 __all__ = ["register_iot_mqtt_tools", "_get_mqtt_client", "_mqtt_publish"]
 
-MQTT_BROKER = os.getenv("MQTT_BROKER", "192.168.0.101")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USER = os.getenv("MQTT_USER", "")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
 
 
-def _get_mqtt_client():
+def _get_mqtt_client() -> Any:
     """Get configured MQTT client.
 
     Returns:
@@ -41,94 +50,90 @@ def _get_mqtt_client():
         return None
 
 
-def _mqtt_publish(topic: str, payload: str, retain: bool = False) -> str:
+def _mqtt_publish(topic: str, payload: str, retain: bool = False, timeout_seconds: int = 10) -> str:
     """Publish an MQTT message.
 
     Args:
         topic: MQTT topic (e.g. "cmnd/tasmota_389AF7/Power").
         payload: Message payload (e.g. "ON", "OFF", "TOGGLE").
         retain: Whether to retain the message.
+        timeout_seconds: MQTT broker connection timeout in seconds.
 
     Returns:
         JSON string with result.
     """
     client = _get_mqtt_client()
     if not client:
-        return json.dumps(
-            {
-                "success": False,
-                "error": (
-                    "paho-mqtt not installed. Install with: pip install paho-mqtt"
-                ),
-            },
-            indent=2,
+        return _error_response_extended(
+            code="DEPENDENCY_MISSING",
+            message="paho-mqtt not installed. Install with: pip install paho-mqtt",
         )
 
     try:
-        client.connect(MQTT_BROKER, MQTT_PORT, 5)
+        client.connect(MQTT_BROKER, MQTT_PORT, timeout_seconds)
         result = client.publish(topic, payload, retain=retain)
         client.disconnect()
 
-        return json.dumps(
+        return _success_response(
             {
-                "success": True,
                 "broker": f"{MQTT_BROKER}:{MQTT_PORT}",
                 "topic": topic,
                 "payload": payload,
                 "retain": retain,
                 "mqtt_result": result.rc,
-            },
-            indent=2,
+            }
         )
     except Exception as exc:
-        return json.dumps({"success": False, "error": str(exc)}, indent=2)
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
 
-def _mqtt_get_state(topic_prefix: str, timeout_sec: int = 5) -> str:
+def _mqtt_get_state(topic_prefix: str, timeout_seconds: int = 10) -> str:
     """Get current state of a device via MQTT.
 
     Subscribes to the state topic and returns the latest value.
 
     Args:
         topic_prefix: Device topic prefix (e.g. "tasmota_389AF7").
-        timeout_sec: How long to wait for state message in seconds.
+        timeout_seconds: How long to wait for state message in seconds.
 
     Returns:
         JSON string with device state.
     """
     client = _get_mqtt_client()
     if not client:
-        return json.dumps(
-            {"success": False, "error": "paho-mqtt not installed"},
-            indent=2,
+        return _error_response_extended(
+            code="DEPENDENCY_MISSING",
+            message="paho-mqtt not installed",
         )
 
     state_topic = f"tele/{topic_prefix}/STATE"
-    received_messages: list[Dict[str, str]] = []
+    received_messages: list[dict[str, str]] = []
 
-    def on_message(_client, _userdata, msg):
+    def on_message(_client: Any, _userdata: Any, msg: Any) -> None:
         received_messages.append({"topic": msg.topic, "payload": msg.payload.decode()})
 
     client.on_message = on_message
     try:
-        client.connect(MQTT_BROKER, MQTT_PORT, 5)
+        client.connect(MQTT_BROKER, MQTT_PORT, timeout_seconds)
         client.subscribe(state_topic)
         client.loop_start()
-        time.sleep(timeout_sec)
-        client.loop_stop()
-        client.disconnect()
+        time.sleep(timeout_seconds)
     except Exception as exc:
-        return json.dumps({"success": False, "error": str(exc)}, indent=2)
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+    finally:
+        try:
+            client.loop_stop()
+        except Exception:
+            pass
+        try:
+            client.disconnect()
+        except Exception:
+            pass
 
     if not received_messages:
-        return json.dumps(
-            {
-                "success": False,
-                "error": "No state message received within timeout",
-                "topic": state_topic,
-                "timeout": timeout_sec,
-            },
-            indent=2,
+        return _error_response_extended(
+            code="TIMEOUT",
+            message="No state message received within timeout",
         )
 
     latest = received_messages[-1]
@@ -137,14 +142,12 @@ def _mqtt_get_state(topic_prefix: str, timeout_sec: int = 5) -> str:
     except json.JSONDecodeError:
         payload = latest["payload"]
 
-    return json.dumps(
+    return _success_response(
         {
-            "success": True,
             "topic": latest["topic"],
             "state": payload,
             "messages_received": len(received_messages),
-        },
-        indent=2,
+        }
     )
 
 
@@ -162,9 +165,8 @@ def _mqtt_build_command_topic(device_name: str, command: str = "Power") -> str:
     state_topic = f"stat/{device_name}/{command}"
     tele_topic = f"tele/{device_name}/STATE"
 
-    return json.dumps(
+    return _success_response(
         {
-            "success": True,
             "device_name": device_name,
             "command": command,
             "command_topic": topic,
@@ -177,44 +179,63 @@ def _mqtt_build_command_topic(device_name: str, command: str = "Power") -> str:
                 "0": "Set brightness/channel to 0",
                 "100": "Set brightness/channel to 100",
             },
-        },
-        indent=2,
+        }
     )
 
 
-def register_iot_mqtt_tools(mcp) -> None:
+def register_iot_mqtt_tools(mcp: Any) -> None:
     """Register IoT MQTT tools with the MCP server."""
 
     @mcp.tool()
-    def iot_mqtt_publish(topic: str, payload: str, retain: bool = False) -> str:
+    @inject_tool_risk_prefix
+    def iot_mqtt_publish(
+        topic: str, payload: str, retain: bool = False, timeout_seconds: int = 10
+    ) -> str:
         """Publish an MQTT message to control an IoT device.
 
         Args:
             topic: MQTT topic (e.g. "cmnd/tasmota_389AF7/Power").
             payload: Message payload (e.g. "ON", "OFF", "TOGGLE").
             retain: Whether to retain the message (default False).
+            timeout_seconds: MQTT broker connection timeout in seconds (default 10).
 
         Returns:
             JSON with result.
+
+        @since v1.2.0
         """
-        return _mqtt_publish(topic, payload, retain)
+        try:
+            start_tool_context()
+            increment_tool_count("iot_mqtt_publish")
+            return _mqtt_publish(topic, payload, retain, timeout_seconds)
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
-    def iot_mqtt_get_state(topic_prefix: str, timeout: int = 5) -> str:
+    @inject_tool_risk_prefix
+    def iot_mqtt_get_state(topic_prefix: str, timeout_seconds: int = 10) -> str:
         """Get current state of a device via MQTT.
 
         Subscribes to the state topic and returns the latest value.
 
         Args:
             topic_prefix: Device topic prefix (e.g. "tasmota_389AF7").
-            timeout: How long to wait for state message (seconds).
+            timeout_seconds: How long to wait for state message in seconds (default 10).
 
         Returns:
             JSON with device state.
+
+        @since v1.2.0
         """
-        return _mqtt_get_state(topic_prefix, timeout)
+        try:
+            start_tool_context()
+            increment_tool_count("iot_mqtt_get_state")
+            return _mqtt_get_state(topic_prefix, timeout_seconds)
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
     @mcp.tool()
+    @inject_tool_risk_prefix
     def iot_mqtt_build_command_topic(device_name: str, command: str = "Power") -> str:
         """Build MQTT command topic for a device.
 
@@ -224,5 +245,12 @@ def register_iot_mqtt_tools(mcp) -> None:
 
         Returns:
             JSON with topic information.
+
+        @since v1.2.0
         """
-        return _mqtt_build_command_topic(device_name, command)
+        try:
+            start_tool_context()
+            increment_tool_count("iot_mqtt_build_command_topic")
+            return _mqtt_build_command_topic(device_name, command)
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))

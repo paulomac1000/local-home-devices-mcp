@@ -13,14 +13,31 @@ Architecture:
 
 import inspect
 import json
-import os
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Any, Dict, Optional
+from typing import Any
 
 from fastmcp import FastMCP
 
+from tools.constants import (
+    ALLOW_PUBLIC_BIND,
+    BIND_HOST,
+    DEFAULT_NETWORK_RANGE,
+    END_IP,
+    HEALTH_CHECK_PORT,
+    MCP_SSE_PORT,
+    MQTT_BROKER,
+    MQTT_PORT,
+    REST_API_PORT,
+    START_IP,
+    TOOL_MANIFESTS,
+    TOOLS_VERSION,
+    get_logger,
+    get_tool_counts,
+    setup_logging,
+)
 from tools.iot_control import register_iot_control_tools
 from tools.iot_devices import register_iot_device_tools
 from tools.iot_discovery import register_iot_discovery_tools
@@ -61,28 +78,15 @@ def start_health_server(port: int = 9100) -> HTTPServer:
     Returns:
         The HTTP server instance.
     """
-    server = HTTPServer(("0.0.0.0", port), HealthHandler)
-    threading.Thread(
-        target=server.serve_forever, daemon=True, name="HealthServer"
-    ).start()
-    print(f"[health] HTTP health endpoint started on port {port}")
+    server = HTTPServer((BIND_HOST, port), HealthHandler)
+    threading.Thread(target=server.serve_forever, daemon=True, name="HealthServer").start()
+    get_logger("health").info("HTTP health endpoint started on port %d", port)
     return server
 
 
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
-
-MQTT_BROKER = os.getenv("MQTT_BROKER", "192.168.0.101")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-MCP_SSE_PORT = int(os.getenv("MCP_SSE_PORT", "9101"))
-REST_API_PORT = int(os.getenv("REST_API_PORT", "9102"))
-START_IP = os.getenv("START_IP", "192.168.0.1")
-END_IP = os.getenv("END_IP", "192.168.0.254")
-
-# Build default network range for discovery
-_default_octets = START_IP.rsplit(".", 1)[0]
-DEFAULT_NETWORK_RANGE = os.getenv("NETWORK_RANGE", f"{_default_octets}.0/24")
 
 # =============================================================================
 # INITIALIZE MCP SERVER
@@ -105,16 +109,16 @@ register_iot_mqtt_tools(mcp)
 # =============================================================================
 
 
-def get_all_tools() -> Dict[str, Any]:
+def get_all_tools() -> Any:
     """Return a dictionary of all registered tools."""
     if hasattr(mcp, "_tool_manager") and hasattr(mcp._tool_manager, "_tools"):
-        return mcp._tool_manager._tools  # type: ignore[union-attr]
+        return mcp._tool_manager._tools
     if hasattr(mcp, "_tools"):
-        return mcp._tools  # type: ignore[return-value]
+        return mcp._tools
     return {}
 
 
-def get_tool(name: str) -> Optional[Any]:
+def get_tool(name: str) -> Any | None:
     """Return tool by name if available."""
     return get_all_tools().get(name)
 
@@ -132,7 +136,7 @@ tool_count = get_tool_count()
 # =============================================================================
 
 
-def create_rest_app():
+def create_rest_app() -> Any:
     """Create REST API application for tools (alternative access, not MCP)."""
     from starlette.applications import Starlette
     from starlette.middleware import Middleware
@@ -140,42 +144,41 @@ def create_rest_app():
     from starlette.responses import JSONResponse
     from starlette.routing import Route
 
-    async def health(request):
+    async def health(request: Any) -> JSONResponse:
         return JSONResponse(
             {
                 "status": "healthy",
                 "server": "IoT-Observer",
-                "version": "1.1.0",
+                "version": TOOLS_VERSION,
                 "tools_registered": get_tool_count(),
+                "tool_invocation_counts": get_tool_counts(),
                 "endpoints": {
-                    "mcp_sse": f"http://0.0.0.0:{MCP_SSE_PORT}/sse",
-                    "mcp_messages": f"http://0.0.0.0:{MCP_SSE_PORT}/messages",
-                    "rest_api": f"http://0.0.0.0:{REST_API_PORT}/api/",
+                    "mcp_sse": f"http://{BIND_HOST}:{MCP_SSE_PORT}/sse",
+                    "mcp_messages": f"http://{BIND_HOST}:{MCP_SSE_PORT}/messages",
+                    "rest_api": f"http://{BIND_HOST}:{REST_API_PORT}/api/",
                 },
             }
         )
 
-    async def list_tools_endpoint(request):
+    async def list_tools_endpoint(request: Any) -> JSONResponse:
         tools = get_all_tools()
         tool_list = []
         for name, tool in tools.items():
             desc = None
             if hasattr(tool, "description") and tool.description:
                 desc = tool.description
-            elif (
-                hasattr(tool, "fn") and hasattr(tool.fn, "__doc__") and tool.fn.__doc__
-            ):
+            elif hasattr(tool, "fn") and hasattr(tool.fn, "__doc__") and tool.fn.__doc__:
                 desc = tool.fn.__doc__.strip().split("\n")[0]
             tool_list.append({"name": name, "description": desc})
         return JSONResponse(
             {
                 "success": True,
                 "total": len(tool_list),
-                "tools": sorted(tool_list, key=lambda x: x["name"]),
+                "tools": sorted(tool_list, key=lambda x: str(x.get("name", ""))),
             }
         )
 
-    async def call_tool_endpoint(request):
+    async def call_tool_endpoint(request: Any) -> JSONResponse:
         tool_name = request.path_params.get("tool_name", "")
 
         try:
@@ -247,6 +250,16 @@ def create_rest_app():
                 status_code=500,
             )
 
+    async def tool_manifest_endpoint(request: Any) -> JSONResponse:
+        tool_name = request.path_params.get("tool_name", "")
+        manifest = TOOL_MANIFESTS.get(tool_name)
+        if manifest is None:
+            return JSONResponse(
+                {"success": False, "error": f"Tool '{tool_name}' not found"},
+                status_code=404,
+            )
+        return JSONResponse({"success": True, "data": manifest})
+
     routes = [
         Route("/health", endpoint=health, methods=["GET"]),
         Route("/api/health", endpoint=health, methods=["GET"]),
@@ -255,6 +268,11 @@ def create_rest_app():
             "/api/tools/{tool_name}",
             endpoint=call_tool_endpoint,
             methods=["POST"],
+        ),
+        Route(
+            "/api/tools/{tool_name}/manifest",
+            endpoint=tool_manifest_endpoint,
+            methods=["GET"],
         ),
     ]
 
@@ -275,41 +293,60 @@ def run_rest_api() -> None:
     import uvicorn
 
     app = create_rest_app()
-    print(f"[rest] REST API started on port {REST_API_PORT}")
-    uvicorn.run(app, host="0.0.0.0", port=REST_API_PORT, log_level="warning")
+    get_logger("rest").info("REST API started on port %d", REST_API_PORT)
+    uvicorn.run(app, host=BIND_HOST, port=REST_API_PORT, log_level="warning")
 
 
 # =============================================================================
 # MAIN ENTRY POINT
 # =============================================================================
 
-if __name__ == "__main__":
+
+def main() -> None:
+    """Entry point for the IoT MCP server."""
+    setup_logging()
+    logger = get_logger("server")
+
+    # Guard: public binding requires explicit confirmation
+    if BIND_HOST == "0.0.0.0" and not ALLOW_PUBLIC_BIND:
+        logger.critical(
+            "Binding to 0.0.0.0 without MCP_UNSAFE_PUBLIC_ACCESS_CONFIRMED=1. "
+            "Set MCP_UNSAFE_PUBLIC_ACCESS_CONFIRMED=1 to confirm."
+        )
+        sys.exit(1)
+    if BIND_HOST == "0.0.0.0":
+        logger.critical("Server bound to 0.0.0.0 — tools are exposed to the network.")
+
     # 1. Start health check server (port 9100)
-    start_health_server(port=9100)
+    start_health_server(port=HEALTH_CHECK_PORT)
     HEALTH_STATE["status"] = "healthy"
     HEALTH_STATE["last_heartbeat"] = time.time()
 
-    print("[server] " + "=" * 50)
-    print("[server] IoT-Observer MCP Server")
-    print("[server] " + "=" * 50)
-    print(f"[server] MQTT Broker: {MQTT_BROKER}:{MQTT_PORT}")
-    print(f"[server] Network Range: {START_IP} - {END_IP}")
-    print(f"[server] Scan CIDR: {DEFAULT_NETWORK_RANGE}")
-    print("[server] Device Cache: /app/data/discovered_devices.json")
-    print(f"[server] Registered tools: {tool_count}")
-    print("[server] " + "-" * 50)
+    logger.info("=" * 50)
+    logger.info("IoT-Observer MCP Server")
+    logger.info("=" * 50)
+    logger.info("MQTT Broker: %s:%s", MQTT_BROKER, MQTT_PORT)
+    logger.info("Network Range: %s - %s", START_IP, END_IP)
+    logger.info("Scan CIDR: %s", DEFAULT_NETWORK_RANGE)
+    logger.info("Device Cache: /app/data/discovered_devices.json")
+    logger.info("Registered tools: %d", tool_count)
+    logger.info("-" * 50)
 
     # 2. Start REST API in a separate thread (port 9102)
     rest_thread = threading.Thread(target=run_rest_api, daemon=True, name="RestAPI")
     rest_thread.start()
 
-    print("[server] Endpoints:")
-    print("[server]   Health:      http://0.0.0.0:9100/health")
-    print(f"[server]   MCP SSE:     http://0.0.0.0:{MCP_SSE_PORT}/sse")
-    print(f"[server]   MCP MSG:     http://0.0.0.0:{MCP_SSE_PORT}/messages")
-    print(f"[server]   REST API:    http://0.0.0.0:{REST_API_PORT}/api/")
-    print("[server] " + "=" * 50)
+    logger.info("Endpoints:")
+    logger.info("  Health:      http://%s:%s/health", BIND_HOST, HEALTH_CHECK_PORT)
+    logger.info("  MCP SSE:     http://%s:%s/sse", BIND_HOST, MCP_SSE_PORT)
+    logger.info("  MCP MSG:     http://%s:%s/messages", BIND_HOST, MCP_SSE_PORT)
+    logger.info("  REST API:    http://%s:%s/api/", BIND_HOST, REST_API_PORT)
+    logger.info("=" * 50)
 
     # 3. Start MCP SSE server (port 9101) - BLOCKING!
-    print(f"[server] Starting MCP SSE transport on port {MCP_SSE_PORT}...")
-    mcp.run(transport="sse", host="0.0.0.0", port=MCP_SSE_PORT)
+    logger.info("Starting MCP SSE transport on port %s...", MCP_SSE_PORT)
+    mcp.run(transport="sse", host=BIND_HOST, port=MCP_SSE_PORT)
+
+
+if __name__ == "__main__":
+    main()
