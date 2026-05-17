@@ -118,8 +118,8 @@ jobs:
         run: |
           docker run --rm tasmota-openbk-mcp:test python -c "
           from server import get_tool_count
-          assert get_tool_count() == 13
-          print('Tool count OK: 13')
+           assert get_tool_count() == 14
+           print('Tool count OK: 14')
           "
 
       - name: Smoke test — REST API health + tools
@@ -130,6 +130,6 @@ jobs:
           sleep 5
           curl -fsS --retry 5 --retry-delay 2 http://localhost:9100/health || exit 1
           TOOLS=$(curl -s http://localhost:9102/api/tools | python3 -c "import sys,json; print(json.load(sys.stdin)['total'])")
-          [ "$TOOLS" = "13" ] || (echo "FAIL: expected 13 tools, got $TOOLS" && exit 1)
+          [ "$TOOLS" = "14" ] || (echo "FAIL: expected 14 tools, got $TOOLS" && exit 1)
           echo "REST API smoke test OK ($TOOLS tools)"
           docker stop mcp-smoke

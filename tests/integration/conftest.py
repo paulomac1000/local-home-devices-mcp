@@ -69,6 +69,8 @@ class MCPWrapper:
 @pytest.fixture(scope="session")
 def mcp_client():
     """Create real MCP server and return a call_tool wrapper."""
+    from unittest.mock import patch
+
     from fastmcp import FastMCP
 
     from tools.iot_control import register_iot_control_tools
@@ -76,14 +78,17 @@ def mcp_client():
     from tools.iot_discovery import register_iot_discovery_tools
     from tools.iot_mqtt import register_iot_mqtt_tools
 
-    mcp = FastMCP("IoT-Integration-Test")
+    # Write-tool error-path tests need the guard enabled so calls reach
+    # the tool logic (name resolution, validation) and not the gate.
+    with patch("tools.constants.ENABLE_WRITE_OPERATIONS", True):
+        mcp = FastMCP("IoT-Integration-Test")
 
-    register_iot_device_tools(mcp)
-    register_iot_discovery_tools(mcp)
-    register_iot_control_tools(mcp)
-    register_iot_mqtt_tools(mcp)
+        register_iot_device_tools(mcp)
+        register_iot_discovery_tools(mcp)
+        register_iot_control_tools(mcp)
+        register_iot_mqtt_tools(mcp)
 
-    return MCPWrapper(mcp)
+        yield MCPWrapper(mcp)
 
 
 @pytest.fixture(scope="module")
