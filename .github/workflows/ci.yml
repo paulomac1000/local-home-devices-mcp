@@ -83,13 +83,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Verify image
-        run: |
-          docker run --rm tasmota-openbk-mcp:test python -c "
-          from server import get_tool_count
-          print(f'Tools registered: {get_tool_count()}')
-          assert get_tool_count() > 0, 'No tools registered'
-          print('Image verification OK')
-          "
+        run: docker run --rm tasmota-openbk-mcp:test python3 -c 'from server import get_tool_count; print(f"Tools registered: {get_tool_count()}"); assert get_tool_count() > 0, "No tools registered"; print("Image verification OK")'
 
   smoke-test:
     runs-on: ubuntu-latest
@@ -115,12 +109,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Smoke test — tool count (import)
-        run: |
-          docker run --rm tasmota-openbk-mcp:test python -c "
-          from server import get_tool_count
-           assert get_tool_count() == 14
-           print('Tool count OK: 14')
-          "
+        run: docker run --rm tasmota-openbk-mcp:test python3 -c 'from server import get_tool_count; assert get_tool_count() == 14; print("Tool count OK: 14")'
 
       - name: Smoke test — REST API health + tools
         run: |
