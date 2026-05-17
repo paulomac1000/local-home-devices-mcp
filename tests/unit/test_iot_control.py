@@ -608,3 +608,55 @@ class TestRegistrationWrappers:
             data = json.loads(result)
             assert data["success"] is False
             assert "fail" in data["error"]["message"]
+
+
+class TestWriteGuardDisabled:
+    """Write guard: tools must return WRITE_DISABLED when ENABLE_WRITE_OPERATIONS=0."""
+
+    def test_set_power_rejected_when_write_disabled(self, mock_mcp, monkeypatch):
+        monkeypatch.setattr("tools.constants.ENABLE_WRITE_OPERATIONS", False)
+        register_iot_control_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_set_power")
+        with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+                with patch("tools.iot_control.requests.get") as mock_get:
+                    resp = MagicMock()
+                    resp.status_code = 200
+                    mock_get.return_value = resp
+                    result = fn("192.168.1.100", "ON")
+                    data = json.loads(result)
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "WRITE_DISABLED"
+                    mock_get.assert_not_called()
+
+    def test_set_brightness_rejected_when_write_disabled(self, mock_mcp, monkeypatch):
+        monkeypatch.setattr("tools.constants.ENABLE_WRITE_OPERATIONS", False)
+        register_iot_control_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_set_brightness")
+        with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+                with patch("tools.iot_control.requests.get") as mock_get:
+                    resp = MagicMock()
+                    resp.status_code = 200
+                    mock_get.return_value = resp
+                    result = fn("192.168.1.100", 50)
+                    data = json.loads(result)
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "WRITE_DISABLED"
+                    mock_get.assert_not_called()
+
+    def test_restart_rejected_when_write_disabled(self, mock_mcp, monkeypatch):
+        monkeypatch.setattr("tools.constants.ENABLE_WRITE_OPERATIONS", False)
+        register_iot_control_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_restart_device")
+        with patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.100"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+                with patch("tools.iot_control.requests.get") as mock_get:
+                    resp = MagicMock()
+                    resp.status_code = 200
+                    mock_get.return_value = resp
+                    result = fn("192.168.1.100")
+                    data = json.loads(result)
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "WRITE_DISABLED"
+                    mock_get.assert_not_called()

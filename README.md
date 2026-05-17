@@ -129,7 +129,13 @@ All read-only operations — no device state is modified.
 |------|------|-------------|
 | `iot_set_power` | [WRITE] | Turn a channel ON, OFF, or TOGGLE |
 | `iot_set_brightness` | [WRITE] | Set brightness level (0-100%) |
-| `iot_restart_device` | [DANGEROUS] | Restart the device (temporarily disconnects) |
+| `iot_restart_device` | [DESTRUCTIVE] | Restart the device (temporarily disconnects) |
+
+### Introspection
+
+| Tool | Risk | Description |
+|------|------|-------------|
+| `describe_iot_capabilities` | [READ] | Describe all IoT tools, manifests, and transports |
 
 ### MQTT Integration
 
@@ -163,6 +169,7 @@ All configuration is via environment variables. See `.env.example` for a complet
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `ENABLE_WRITE_OPERATIONS` | `0` | Set to `1` to enable write/destructive tools (set_power, restart, etc.) |
 | `MQTT_PORT` | `1883` | MQTT broker port |
 | `MQTT_USER` | -- | MQTT username |
 | `MQTT_PASSWORD` | -- | MQTT password |
@@ -176,6 +183,7 @@ All configuration is via environment variables. See `.env.example` for a complet
 - `tools/iot_devices.py` — Device info/power state (2 tools)
 - `tools/iot_discovery.py` — Network scanning/device discovery/cache (4 tools)
 - `tools/iot_mqtt.py` — MQTT publish/state/topic (3 tools)
+- `tools/iot_meta.py` — Capability introspection, manifests and transports (1 tool)
 
 ## Supported Devices
 

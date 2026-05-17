@@ -41,13 +41,19 @@ from tools.constants import (
 from tools.iot_control import register_iot_control_tools
 from tools.iot_devices import register_iot_device_tools
 from tools.iot_discovery import register_iot_discovery_tools
+from tools.iot_meta import register_iot_meta_tools
 from tools.iot_mqtt import register_iot_mqtt_tools
 
 # =============================================================================
 # HEALTH CHECK SERVER (port 9100)
 # =============================================================================
 
-HEALTH_STATE = {"status": "starting", "last_heartbeat": time.time()}
+HEALTH_STATE: dict[str, Any] = {
+    "status": "starting",
+    "tools": 0,
+    "tools_version": TOOLS_VERSION,
+    "last_heartbeat": time.time(),
+}
 
 
 class HealthHandler(BaseHTTPRequestHandler):
@@ -102,6 +108,7 @@ register_iot_device_tools(mcp)
 register_iot_discovery_tools(mcp)
 register_iot_control_tools(mcp)
 register_iot_mqtt_tools(mcp)
+register_iot_meta_tools(mcp)
 
 
 # =============================================================================
@@ -320,6 +327,8 @@ def main() -> None:
     # 1. Start health check server (port 9100)
     start_health_server(port=HEALTH_CHECK_PORT)
     HEALTH_STATE["status"] = "healthy"
+    HEALTH_STATE["tools"] = tool_count
+    HEALTH_STATE["tools_version"] = TOOLS_VERSION
     HEALTH_STATE["last_heartbeat"] = time.time()
 
     logger.info("=" * 50)
