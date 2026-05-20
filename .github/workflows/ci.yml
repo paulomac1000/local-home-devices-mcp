@@ -81,7 +81,6 @@ jobs:
           pytest tests/integration/ -v --tb=short
 
       - name: Upload coverage to Codecov
-        if: ${{ secrets.CODECOV_TOKEN != '' }}
         uses: codecov/codecov-action@v6
         with:
           files: ./coverage.xml
