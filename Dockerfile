@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     nmap \
     && rm -rf /var/lib/apt/lists/*
 
+RUN groupadd -r appuser && useradd -r -g appuser -m -d /app appuser
+
 WORKDIR /app
 
 COPY pyproject.toml .
@@ -18,9 +20,12 @@ RUN pip install --no-cache-dir -e ".[mqtt]"
 COPY server.py .
 COPY tools/ ./tools/
 
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data \
+    && chown -R appuser:appuser /app
 
 RUN printf '#!/bin/bash\npython server.py\n' > /app/start.sh && chmod +x /app/start.sh
+
+USER appuser
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:9100/health || exit 1
