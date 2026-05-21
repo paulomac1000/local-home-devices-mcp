@@ -2,10 +2,13 @@ import collections
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import uuid
 from typing import Any
+
+from tools.validators import ValidationError
 
 # =============================================================================
 # ENVIRONMENT CONFIGURATION
@@ -24,11 +27,17 @@ HEALTH_CHECK_PORT = int(os.getenv("HEALTH_CHECK_PORT", "9100"))
 BIND_HOST = os.getenv("BIND_HOST", "127.0.0.1")
 ALLOW_PUBLIC_BIND = os.getenv("MCP_UNSAFE_PUBLIC_ACCESS_CONFIRMED", "0") == "1"
 
+# Server-level write guard. Write and destructive tools are rejected before any
+# I/O unless this flag is explicitly enabled. This is a server-level authorization
+# gate decided by the operator — distinct from the per-tool `requires_confirmation`
+# manifest field, which is an agent-level user-consent hint.
+ENABLE_WRITE_OPERATIONS = os.getenv("ENABLE_WRITE_OPERATIONS", "0") == "1"
+
 # Build default network range for discovery (CIDR notation)
 _DEFAULT_OCTETS = START_IP.rsplit(".", 1)[0]
 DEFAULT_NETWORK_RANGE = NETWORK_RANGE or f"{_DEFAULT_OCTETS}.0/24"
 
-TOOLS_VERSION = "1.2.0"
+TOOLS_VERSION = "1.3.0"
 
 # =============================================================================
 # TOOL INVOCATION COUNTERS
@@ -56,22 +65,30 @@ def get_tool_counts() -> dict[str, int]:
 
 
 # =============================================================================
-# LOGGING
+# LOGGING AND SANITIZATION
 # =============================================================================
 
 _LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 _LOGGER_INITIALIZED = False
 
-_SENSITIVE_PATTERNS = [
+# Credential patterns are redacted everywhere — in log output AND in the response
+# payload returned to the agent.
+_CREDENTIAL_PATTERNS = [
     (r"Bearer\s+[A-Za-z0-9\-._~+/]+=*", "Bearer <REDACTED>"),
     (r"Authorization:\s*[^\s]+", "Authorization: <REDACTED>"),
     (r"password[=:]\s*[^\s&]+", "password=<REDACTED>"),
+]
+
+# IP redaction applies to LOG output only. Device IP addresses are functional
+# payload for an IoT discovery server — an agent needs them to address devices in
+# follow-up calls — so they are intentionally NOT redacted from response payloads.
+_LOG_PATTERNS = _CREDENTIAL_PATTERNS + [
     (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "<IP_REDACTED>"),
 ]
 
 
 def sanitize_log_line(line: str) -> str:
-    """Remove sensitive data from a log line.
+    """Remove sensitive data (credentials, IP addresses) from a log line.
 
     Args:
         line: Raw log line that may contain credentials or tokens.
@@ -79,11 +96,38 @@ def sanitize_log_line(line: str) -> str:
     Returns:
         Sanitized line with sensitive patterns replaced by REDACTED markers.
     """
-    import re
-
-    for pattern, replacement in _SENSITIVE_PATTERNS:
+    for pattern, replacement in _LOG_PATTERNS:
         line = re.sub(pattern, replacement, line, flags=re.IGNORECASE)
     return line
+
+
+def _sanitize_secrets(text: str) -> str:
+    """Redact credential patterns from a string (no IP redaction)."""
+    for pattern, replacement in _CREDENTIAL_PATTERNS:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    return text
+
+
+def sanitize_response_data(data: Any) -> Any:
+    """Recursively redact credentials from a response payload before returning it.
+
+    Applied at the `_success_response()` boundary so a tool that forgets to
+    sanitize cannot leak a token or password to the agent. Device IP addresses
+    are preserved — they are functional data, not secrets.
+
+    Args:
+        data: Arbitrary response payload (str, dict, list, or scalar).
+
+    Returns:
+        The payload with credential patterns redacted.
+    """
+    if isinstance(data, str):
+        return _sanitize_secrets(data)
+    if isinstance(data, dict):
+        return {k: sanitize_response_data(v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [sanitize_response_data(item) for item in data]
+    return data
 
 
 _request_id_context = threading.local()
@@ -170,6 +214,26 @@ def get_logger(name: str) -> logging.Logger:
 
 
 # =============================================================================
+# WRITE GUARD
+# =============================================================================
+
+
+def check_write_enabled() -> None:
+    """Raise ValidationError when server-level write operations are disabled.
+
+    MUST be called at the start of every write/destructive tool wrapper, before
+    any I/O. See ENABLE_WRITE_OPERATIONS.
+
+    Raises:
+        ValidationError: If ENABLE_WRITE_OPERATIONS is not enabled.
+    """
+    if not ENABLE_WRITE_OPERATIONS:
+        raise ValidationError(
+            "Write operations are disabled. Set ENABLE_WRITE_OPERATIONS=1 on the server to enable."
+        )
+
+
+# =============================================================================
 # RESPONSE HELPERS
 # =============================================================================
 
@@ -182,6 +246,10 @@ def _build_meta(
 ) -> dict[str, Any]:
     """Build _meta envelope for responses.
 
+    The request_id is read from the current tool context (set by
+    start_tool_context) so that it matches the id written to log lines for the
+    same invocation. It is NOT regenerated here.
+
     Args:
         duration_ms: Optional elapsed time in milliseconds.
         cached: Optional whether the response came from cache.
@@ -192,7 +260,7 @@ def _build_meta(
         Dictionary with request_id, tool_version and extra fields.
     """
     meta: dict[str, Any] = {
-        "request_id": str(uuid.uuid4()),
+        "request_id": get_request_id(),
         "tool_version": TOOLS_VERSION,
     }
     if duration_ms is not None:
@@ -214,6 +282,9 @@ def _success_response(
 ) -> str:
     """Build consistent success response as JSON string.
 
+    The payload is run through sanitize_response_data() at this boundary so no
+    tool can leak credentials to the agent.
+
     Args:
         data: Data payload to include in the response.
         duration_ms: Optional elapsed time in milliseconds.
@@ -227,7 +298,7 @@ def _success_response(
     return json.dumps(
         {
             "success": True,
-            "data": data,
+            "data": sanitize_response_data(data),
             "_meta": _build_meta(
                 duration_ms=duration_ms, cached=cached, retry_safe=retry_safe, **meta_extra
             ),
@@ -296,7 +367,7 @@ def _error_response_extended(
     if suggestion:
         err["suggestion"] = suggestion
     if available_names:
-        err["available_names"] = available_names
+        err["available_names"] = available_names[:50]
     return json.dumps(
         {
             "success": False,
@@ -309,192 +380,211 @@ def _error_response_extended(
 
 
 # =============================================================================
-# TOOL MANIFESTS
+# TOOL MANIFEST FACTORIES
 # =============================================================================
+#
+# Picking the factory IS the criticality decision. There is no fourth ad-hoc
+# path. Each factory's output satisfies the Risk Consistency Matrix from
+# mcp-server-standards.md; tests/unit/test_constants.py asserts this.
 
-TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
-    "iot_discover_devices": {
-        "name": "iot_discover_devices",
-        "version": "1.2.0",
+
+def _make_manifest(
+    name: str,
+    *,
+    timeout_ms: int = 10000,
+    latency: str = "moderate",
+    cost: str = "moderate",
+    determinism: str = "env-dependent",
+    side_effects: str = "read",
+    concurrent_safe: bool = True,
+    privacy: str = "none",
+) -> dict[str, Any]:
+    """Build a READ-tool manifest. READ tools are idempotent, retryable, reversible.
+
+    Args:
+        name: Registered tool name.
+        timeout_ms: Expected maximum execution time in milliseconds.
+        latency: Latency class (instant/fast/moderate/slow/long-running).
+        cost: Cost class (cheap/moderate/expensive).
+        determinism: Determinism class.
+        side_effects: "none" for pure tools, "read" for tools that read backends.
+        concurrent_safe: Whether concurrent invocations are safe.
+        privacy: "none", "metadata", or "personal".
+
+    Returns:
+        A manifest dict for a READ tool.
+    """
+    return {
+        "name": name,
+        "version": TOOLS_VERSION,
         "risk": "READ",
-        "side_effects": "read",
+        "side_effects": side_effects,
         "idempotent": True,
         "retryable": True,
-        "concurrent_safe": True,
-        "timeout_ms": 120000,
+        "concurrent_safe": concurrent_safe,
+        "timeout_ms": timeout_ms,
         "requires_confirmation": False,
-        "determinism": "env-dependent",
-        "latency": "slow",
-        "cost": "expensive",
-    },
-    "iot_list_devices": {
-        "name": "iot_list_devices",
-        "version": "1.2.0",
-        "risk": "READ",
-        "side_effects": "read",
-        "idempotent": True,
-        "retryable": True,
-        "concurrent_safe": True,
-        "timeout_ms": 1000,
-        "requires_confirmation": False,
-        "determinism": "eventually-consistent",
-        "latency": "instant",
-        "cost": "cheap",
-    },
-    "iot_check_device": {
-        "name": "iot_check_device",
-        "version": "1.2.0",
-        "risk": "READ",
-        "side_effects": "read",
-        "idempotent": True,
-        "retryable": True,
-        "concurrent_safe": True,
-        "timeout_ms": 10000,
-        "requires_confirmation": False,
-        "determinism": "env-dependent",
-        "latency": "moderate",
-        "cost": "moderate",
-    },
-    "iot_find_device_by_name": {
-        "name": "iot_find_device_by_name",
-        "version": "1.2.0",
-        "risk": "READ",
-        "side_effects": "read",
-        "idempotent": True,
-        "retryable": True,
-        "concurrent_safe": True,
-        "timeout_ms": 1000,
-        "requires_confirmation": False,
-        "determinism": "deterministic",
-        "latency": "instant",
-        "cost": "cheap",
-    },
-    "iot_get_device_info": {
-        "name": "iot_get_device_info",
-        "version": "1.2.0",
-        "risk": "READ",
-        "side_effects": "read",
-        "idempotent": True,
-        "retryable": True,
-        "concurrent_safe": True,
-        "timeout_ms": 10000,
-        "requires_confirmation": False,
-        "determinism": "env-dependent",
-        "latency": "moderate",
-        "cost": "moderate",
-    },
-    "iot_get_device_power": {
-        "name": "iot_get_device_power",
-        "version": "1.2.0",
-        "risk": "READ",
-        "side_effects": "read",
-        "idempotent": True,
-        "retryable": True,
-        "concurrent_safe": True,
-        "timeout_ms": 10000,
-        "requires_confirmation": False,
-        "determinism": "env-dependent",
-        "latency": "moderate",
-        "cost": "moderate",
-    },
-    "iot_set_power": {
-        "name": "iot_set_power",
-        "version": "1.2.0",
+        "determinism": determinism,
+        "latency": latency,
+        "cost": cost,
+        "impact": "none",
+        "privacy": privacy,
+        "reversible": True,
+    }
+
+
+def _make_write_manifest(
+    name: str,
+    *,
+    timeout_ms: int = 10000,
+    latency: str = "moderate",
+    cost: str = "moderate",
+    determinism: str = "env-dependent",
+    impact: str = "transient",
+) -> dict[str, Any]:
+    """Build a WRITE-tool manifest. WRITE tools are reversible and retryable.
+
+    Use only for operations designed as reversible/idempotent (set a value,
+    publish a message). Irreversible operations MUST use
+    _make_destructive_manifest() instead.
+
+    Args:
+        name: Registered tool name.
+        timeout_ms: Expected maximum execution time in milliseconds.
+        latency: Latency class.
+        cost: Cost class.
+        determinism: Determinism class.
+        impact: "transient" or "persistent".
+
+    Returns:
+        A manifest dict for a WRITE tool.
+    """
+    return {
+        "name": name,
+        "version": TOOLS_VERSION,
         "risk": "WRITE",
         "side_effects": "write",
-        "idempotent": False,
-        "retryable": False,
+        "idempotent": True,
+        "retryable": True,
         "concurrent_safe": False,
-        "timeout_ms": 10000,
+        "timeout_ms": timeout_ms,
         "requires_confirmation": True,
-        "determinism": "env-dependent",
-        "latency": "moderate",
-        "cost": "moderate",
-    },
-    "iot_set_brightness": {
-        "name": "iot_set_brightness",
-        "version": "1.2.0",
-        "risk": "WRITE",
-        "side_effects": "write",
-        "idempotent": False,
-        "retryable": False,
-        "concurrent_safe": False,
-        "timeout_ms": 10000,
-        "requires_confirmation": True,
-        "determinism": "env-dependent",
-        "latency": "moderate",
-        "cost": "moderate",
-    },
-    "iot_restart_device": {
-        "name": "iot_restart_device",
-        "version": "1.2.0",
-        "risk": "DANGEROUS",
+        "determinism": determinism,
+        "latency": latency,
+        "cost": cost,
+        "impact": impact,
+        "privacy": "none",
+        "reversible": True,
+    }
+
+
+def _make_destructive_manifest(
+    name: str,
+    *,
+    timeout_ms: int = 30000,
+    latency: str = "slow",
+    cost: str = "expensive",
+    determinism: str = "env-dependent",
+    impact: str = "service_outage",
+) -> dict[str, Any]:
+    """Build a DESTRUCTIVE-tool manifest for irreversible operations.
+
+    Use for reboot, factory reset, delete — operations whose effect cannot be
+    undone at the application level. The manifest advertises
+    retryable=false / reversible=false so the agent never re-issues them blindly.
+
+    Args:
+        name: Registered tool name.
+        timeout_ms: Expected maximum execution time in milliseconds.
+        latency: Latency class.
+        cost: Cost class.
+        determinism: Determinism class.
+        impact: "persistent" or "service_outage".
+
+    Returns:
+        A manifest dict for a DESTRUCTIVE tool.
+    """
+    return {
+        "name": name,
+        "version": TOOLS_VERSION,
+        "risk": "DESTRUCTIVE",
         "side_effects": "destructive",
         "idempotent": False,
         "retryable": False,
         "concurrent_safe": False,
-        "timeout_ms": 10000,
+        "timeout_ms": timeout_ms,
         "requires_confirmation": True,
-        "determinism": "env-dependent",
-        "latency": "slow",
-        "cost": "expensive",
-    },
-    "iot_get_wifi_config": {
-        "name": "iot_get_wifi_config",
-        "version": "1.2.0",
-        "risk": "READ",
-        "side_effects": "read",
-        "idempotent": True,
-        "retryable": True,
-        "concurrent_safe": True,
-        "timeout_ms": 10000,
-        "requires_confirmation": False,
-        "determinism": "env-dependent",
-        "latency": "moderate",
-        "cost": "moderate",
-    },
-    "iot_mqtt_publish": {
-        "name": "iot_mqtt_publish",
-        "version": "1.2.0",
-        "risk": "WRITE",
-        "side_effects": "write",
-        "idempotent": False,
-        "retryable": False,
-        "concurrent_safe": False,
-        "timeout_ms": 5000,
-        "requires_confirmation": True,
-        "determinism": "env-dependent",
-        "latency": "moderate",
-        "cost": "moderate",
-    },
-    "iot_mqtt_get_state": {
-        "name": "iot_mqtt_get_state",
-        "version": "1.2.0",
-        "risk": "READ",
-        "side_effects": "read",
-        "idempotent": True,
-        "retryable": True,
-        "concurrent_safe": True,
-        "timeout_ms": 10000,
-        "requires_confirmation": False,
-        "determinism": "env-dependent",
-        "latency": "moderate",
-        "cost": "moderate",
-    },
-    "iot_mqtt_build_command_topic": {
-        "name": "iot_mqtt_build_command_topic",
-        "version": "1.2.0",
-        "risk": "READ",
-        "side_effects": "none",
-        "idempotent": True,
-        "retryable": True,
-        "concurrent_safe": True,
-        "timeout_ms": 100,
-        "requires_confirmation": False,
-        "determinism": "deterministic",
-        "latency": "instant",
-        "cost": "cheap",
-    },
+        "determinism": determinism,
+        "latency": latency,
+        "cost": cost,
+        "impact": impact,
+        "privacy": "none",
+        "reversible": False,
+    }
+
+
+# =============================================================================
+# TOOL MANIFESTS
+# =============================================================================
+
+TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
+    "iot_discover_devices": _make_manifest(
+        "iot_discover_devices",
+        timeout_ms=120000,
+        latency="slow",
+        cost="expensive",
+    ),
+    "iot_list_devices": _make_manifest(
+        "iot_list_devices",
+        timeout_ms=1000,
+        latency="instant",
+        cost="cheap",
+        determinism="eventually-consistent",
+    ),
+    "iot_check_device": _make_manifest("iot_check_device", timeout_ms=10000),
+    "iot_find_device_by_name": _make_manifest(
+        "iot_find_device_by_name",
+        timeout_ms=1000,
+        latency="instant",
+        cost="cheap",
+        determinism="deterministic",
+    ),
+    "iot_get_device_info": _make_manifest(
+        "iot_get_device_info",
+        timeout_ms=10000,
+        privacy="metadata",
+    ),
+    "iot_get_device_power": _make_manifest("iot_get_device_power", timeout_ms=10000),
+    "iot_get_wifi_config": _make_manifest(
+        "iot_get_wifi_config",
+        timeout_ms=10000,
+        privacy="metadata",
+    ),
+    "iot_set_power": _make_write_manifest("iot_set_power", timeout_ms=10000),
+    "iot_set_brightness": _make_write_manifest("iot_set_brightness", timeout_ms=10000),
+    "iot_restart_device": _make_destructive_manifest(
+        "iot_restart_device",
+        timeout_ms=10000,
+        latency="slow",
+    ),
+    "iot_mqtt_publish": _make_write_manifest("iot_mqtt_publish", timeout_ms=5000),
+    "iot_mqtt_get_state": _make_manifest("iot_mqtt_get_state", timeout_ms=10000),
+    "iot_mqtt_build_command_topic": _make_manifest(
+        "iot_mqtt_build_command_topic",
+        timeout_ms=100,
+        latency="instant",
+        cost="cheap",
+        determinism="deterministic",
+        side_effects="none",
+    ),
+    "describe_iot_capabilities": _make_manifest(
+        "describe_iot_capabilities",
+        timeout_ms=100,
+        latency="instant",
+        cost="cheap",
+        determinism="deterministic",
+        side_effects="none",
+    ),
 }
 
 
@@ -511,9 +601,11 @@ def get_tool_manifest(tool_name: str) -> dict[str, Any] | None:
 
 
 def inject_tool_risk_prefix(func: Any) -> Any:
-    """Inject [READ]/[WRITE]/[DANGEROUS] risk prefix from TOOL_MANIFESTS into func.__doc__.
+    """Inject the risk prefix from TOOL_MANIFESTS into func.__doc__.
 
-    The prefix is prepended only if the docstring does not already start with '['.
+    The prefix (e.g. [READ], [WRITE], [DESTRUCTIVE]) is taken from the manifest
+    so the manifest stays the single source of truth. It is prepended only if
+    the docstring does not already start with '['.
 
     Args:
         func: The tool function being decorated.

@@ -2,23 +2,14 @@
 
 [![CI](https://github.com/paulomac1000/tasmota-openbk-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/paulomac1000/tasmota-openbk-mcp/actions/workflows/ci.yml)
 [![Docker](https://github.com/paulomac1000/tasmota-openbk-mcp/actions/workflows/publish.yml/badge.svg)](https://github.com/paulomac1000/tasmota-openbk-mcp/actions/workflows/publish.yml)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![Python 3.14+](https://img.shields.io/badge/python-3.14%2B-blue)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 MCP (Model Context Protocol) server for IoT device management. Enables AI assistants (Claude Desktop, LibreChat, Cline) to discover and control OpenBK (OpenBeken) and Tasmota devices on your local network.
 
-## What is MCP?
-
-MCP (Model Context Protocol) is a standardized protocol that allows AI assistants to call external tools through a defined interface. Think of it as a bridge between AI models and your local network:
-
-- **AI Assistant** → sends request → **MCP Server** → queries devices
-- **AI Assistant** ← receives response ← **MCP Server** ← returns device data
-
-This project exposes your IoT devices as MCP tools, so you can control them using natural language through any MCP-compatible client.
-
 ## Requirements
 
-- Docker (recommended) or Python 3.11+ (for local use)
+- Docker (recommended) or Python 3.14+ (for local use)
 - MQTT broker (optional - required only for MQTT tools)
 - OpenBK or Tasmota devices on the same local network
 - **nmap** - installed automatically in Docker; for local use, install via `apt-get install nmap` (may require root/sudo)
@@ -70,7 +61,7 @@ docker run -d \
   tasmota-openbk-mcp
 ```
 
-### 3. Run locally (Python 3.11+)
+### 3. Run locally (Python 3.14+)
 
 ```bash
 pip install -r requirements.txt
@@ -129,7 +120,13 @@ All read-only operations — no device state is modified.
 |------|------|-------------|
 | `iot_set_power` | [WRITE] | Turn a channel ON, OFF, or TOGGLE |
 | `iot_set_brightness` | [WRITE] | Set brightness level (0-100%) |
-| `iot_restart_device` | [DANGEROUS] | Restart the device (temporarily disconnects) |
+| `iot_restart_device` | [DESTRUCTIVE] | Restart the device (temporarily disconnects) |
+
+### Introspection
+
+| Tool | Risk | Description |
+|------|------|-------------|
+| `describe_iot_capabilities` | [READ] | Describe all IoT tools, manifests, and transports |
 
 ### MQTT Integration
 
@@ -163,6 +160,7 @@ All configuration is via environment variables. See `.env.example` for a complet
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `ENABLE_WRITE_OPERATIONS` | `0` | Set to `1` to enable write/destructive tools (set_power, restart, etc.) |
 | `MQTT_PORT` | `1883` | MQTT broker port |
 | `MQTT_USER` | -- | MQTT username |
 | `MQTT_PASSWORD` | -- | MQTT password |
@@ -176,6 +174,7 @@ All configuration is via environment variables. See `.env.example` for a complet
 - `tools/iot_devices.py` — Device info/power state (2 tools)
 - `tools/iot_discovery.py` — Network scanning/device discovery/cache (4 tools)
 - `tools/iot_mqtt.py` — MQTT publish/state/topic (3 tools)
+- `tools/iot_meta.py` — Capability introspection, manifests and transports (1 tool)
 
 ## Supported Devices
 
@@ -204,7 +203,7 @@ The project has a 4-tier test hierarchy (see `AGENTS.md` for details):
 
 Unit tests run in CI. Integration, smoke, and e2e tests skip when their dependencies (MQTT broker, running server) are absent.
 
-The server follows the `mcp_standards.md` conventions at L2/L3 maturity level. All tools return structured JSON with a `success` field, use extended error codes (`TIMEOUT`, `NAME_NOT_RESOLVED`, `DEVICE_NOT_FOUND`, `INTERNAL_ERROR`), and expose capability manifests via `/api/tools/{name}/manifest`.
+The server follows the [MCP Server Standards](https://github.com/paulomac1000/ai-skills/blob/main/skills/mcp-server-architect/mcp-server-standards.md) at L2/L3 maturity level.
 
 ## Claude Desktop Configuration
 

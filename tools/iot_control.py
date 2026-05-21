@@ -13,11 +13,12 @@ import requests
 from tools.constants import (
     _error_response_extended,
     _success_response,
+    check_write_enabled,
     increment_tool_count,
     inject_tool_risk_prefix,
     start_tool_context,
 )
-from tools.validators import validate_brightness, validate_power_state
+from tools.validators import ValidationError, validate_brightness, validate_power_state
 
 __all__ = [
     "register_iot_control_tools",
@@ -333,8 +334,16 @@ def register_iot_control_tools(mcp: Any) -> None:
         """
         try:
             start_tool_context()
+            check_write_enabled()
             increment_tool_count("iot_set_power")
             return _set_power(identifier, state, channel, timeout_seconds)
+        except ValidationError as exc:
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                retryable=False,
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
         except Exception as exc:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
@@ -360,8 +369,16 @@ def register_iot_control_tools(mcp: Any) -> None:
         """
         try:
             start_tool_context()
+            check_write_enabled()
             increment_tool_count("iot_set_brightness")
             return _set_brightness(identifier, brightness, channel, timeout_seconds)
+        except ValidationError as exc:
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                retryable=False,
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
         except Exception as exc:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
@@ -385,8 +402,16 @@ def register_iot_control_tools(mcp: Any) -> None:
         """
         try:
             start_tool_context()
+            check_write_enabled()
             increment_tool_count("iot_restart_device")
             return _restart_device(identifier, timeout_seconds)
+        except ValidationError as exc:
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                retryable=False,
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
         except Exception as exc:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 

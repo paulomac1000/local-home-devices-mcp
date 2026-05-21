@@ -2,6 +2,30 @@
 
 All notable changes to this project.
 
+## [1.3.0] — 2026-05-17
+
+### Added
+- **Write Guard** — server-level authorization gate (`ENABLE_WRITE_OPERATIONS`) for write/destructive tools. All WRITE and DESTRUCTIVE tools return `WRITE_DISABLED` before any I/O unless explicitly enabled.
+- **Manifest factories** — `_make_manifest()`, `_make_write_manifest()`, `_make_destructive_manifest()` enforce Risk Consistency Matrix compliance at construction time. No ad-hoc manifest dicts.
+- **`describe_iot_capabilities` tool** — zero-I/O [READ] introspection tool exposing full tool catalog with manifests over MCP transport (closes SSE agent gap).
+- **Response payload sanitization** — `sanitize_response_data()` redacts credential patterns at the `_success_response()` boundary. No tool can leak tokens/passwords.
+- **Enriched health endpoint** — `/health` returns `tools` count and `tools_version` alongside health status.
+- **L3 manifest fields** — `impact`, `privacy`, `reversible` on all 14 manifests.
+- **`[tool.bandit]` section** in `pyproject.toml`.
+- **`mypy`** added to dev dependencies.
+- 22 new unit tests — write guard disabled paths, `iot_meta` introspection, `sanitize_response_data`, manifest factories, Risk Consistency Matrix.
+
+### Changed
+- **`iot_restart_device`** risk reclassified from `DANGEROUS` to `DESTRUCTIVE` (fixed command set, not arbitrary shell execution).
+- **WRITE tool manifests** corrected: `idempotent: true`, `retryable: true` (were `false`).
+- **`request_id`** in `_build_meta()` now reads from tool context (`get_request_id()`) instead of generating a fresh UUID — enables log↔response correlation.
+- **`iot_get_device_info`** and **`iot_get_wifi_config`** manifest `privacy` set to `"metadata"`.
+- **Smoke test** tool count updated from 13 to 14.
+
+### Fixed
+- Smoke test `test_tools_list_returns_13_tools` → `test_tools_list_returns_14_tools` (connectivity test).
+- `available_names` capped at 50 entries to prevent oversized error responses.
+
 ## [1.2.0] — 2026-05-08
 
 ### Added

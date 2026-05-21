@@ -15,10 +15,12 @@ from tools.constants import (
     MQTT_PORT,
     _error_response_extended,
     _success_response,
+    check_write_enabled,
     increment_tool_count,
     inject_tool_risk_prefix,
     start_tool_context,
 )
+from tools.validators import ValidationError
 
 __all__ = ["register_iot_mqtt_tools", "_get_mqtt_client", "_mqtt_publish"]
 
@@ -37,7 +39,8 @@ def _get_mqtt_client() -> Any:
 
         try:
             # paho-mqtt >= 2.0 requires callback_api_version
-            client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION1)
+            CallbackAPIVersion = getattr(mqtt, "CallbackAPIVersion")
+            client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION1)
         except (AttributeError, TypeError):
             # paho-mqtt < 2.0
             client = mqtt.Client()
@@ -206,8 +209,16 @@ def register_iot_mqtt_tools(mcp: Any) -> None:
         """
         try:
             start_tool_context()
+            check_write_enabled()
             increment_tool_count("iot_mqtt_publish")
             return _mqtt_publish(topic, payload, retain, timeout_seconds)
+        except ValidationError as exc:
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                retryable=False,
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
         except Exception as exc:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
