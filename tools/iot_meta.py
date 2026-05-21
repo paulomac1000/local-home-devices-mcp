@@ -54,7 +54,7 @@ def register_iot_meta_tools(mcp: Any) -> None:
         Returns:
             JSON with the full tool catalog and manifests.
 
-        @since v1.2.0
+        @since v1.3.0
         """
         try:
             start_tool_context()

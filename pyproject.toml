@@ -48,7 +48,6 @@ python_version = "3.11"
 exclude_dirs = ["tests", ".venv"]
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
 testpaths = ["tests"]
 markers = [
     "unit: Unit tests (fast, mocked, zero I/O)",
