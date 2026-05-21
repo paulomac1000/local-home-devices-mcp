@@ -280,3 +280,20 @@ class TestMqttRegistrationWrappers:
         data = json.loads(result)
         assert data["success"] is True
         assert "command_topic" in data["data"]
+
+
+class TestMqttWriteGuardDisabled:
+    """Write guard: MQTT publish must return WRITE_DISABLED when ENABLE_WRITE_OPERATIONS=0."""
+
+    def test_mqtt_publish_rejected_when_write_disabled(self, mock_mcp, monkeypatch):
+        monkeypatch.setattr("tools.constants.ENABLE_WRITE_OPERATIONS", False)
+        register_iot_mqtt_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_mqtt_publish")
+        with patch("tools.iot_mqtt._get_mqtt_client") as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+            result = fn("cmnd/test/Power", "ON")
+            data = json.loads(result)
+            assert data["success"] is False
+            assert data["error"]["code"] == "WRITE_DISABLED"
+            mock_client.connect.assert_not_called()

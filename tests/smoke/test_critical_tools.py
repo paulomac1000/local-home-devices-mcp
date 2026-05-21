@@ -109,6 +109,7 @@ class TestResponseFormat:
         "iot_mqtt_publish",
         "iot_mqtt_get_state",
         "iot_mqtt_build_command_topic",
+        "describe_iot_capabilities",
     ]
 
     @staticmethod
@@ -118,7 +119,7 @@ class TestResponseFormat:
         except Exception:
             return None
 
-    def test_all_13_tools_return_success_field(self):
+    def test_all_14_tools_return_success_field(self):
         call_map = {
             "iot_discover_devices": {},
             "iot_list_devices": {},
@@ -133,6 +134,7 @@ class TestResponseFormat:
             "iot_mqtt_publish": {"topic": "test/topic", "payload": "ON"},
             "iot_mqtt_get_state": {"topic_prefix": "tasmota_test", "timeout": 2},
             "iot_mqtt_build_command_topic": {"device_name": "tasmota_test"},
+            "describe_iot_capabilities": {},
         }
         for tool_name in self.ALL_TOOLS:
             data = self._call_safe(tool_name, **call_map.get(tool_name, {}))

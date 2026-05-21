@@ -12,6 +12,16 @@ import pytest
 from tests.fixtures import MOCK_OPENBK_DEVICE, MOCK_TASMOTA_DEVICE
 
 
+@pytest.fixture(autouse=True)
+def _enable_write_operations(monkeypatch):
+    """Enable the server-level write guard for all unit tests.
+
+    Write-tool logic tests need writes enabled. The disabled path is covered by
+    dedicated tests that re-disable the guard explicitly.
+    """
+    monkeypatch.setattr("tools.constants.ENABLE_WRITE_OPERATIONS", True)
+
+
 @pytest.fixture
 def mock_requests():
     """Mock requests library for HTTP calls."""

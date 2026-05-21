@@ -23,12 +23,12 @@ class TestHealthConnectivity:
         data = resp.json()
         assert data.get("status") == "healthy"
 
-    def test_tools_list_returns_13_tools(self):
+    def test_tools_list_returns_14_tools(self):
         resp = requests.get(f"{REST_API_URL}/api/tools", timeout=10)
         assert resp.status_code == 200
         data = resp.json()
         assert data.get("success") is True
-        assert data.get("total", 0) == 13
+        assert data.get("total", 0) == 14
 
     def test_response_format_has_success_field(self):
         resp = requests.get(f"{REST_API_URL}/api/health", timeout=5)
