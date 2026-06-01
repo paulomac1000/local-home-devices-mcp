@@ -19,9 +19,7 @@ def _doorbell_reachable():
 
 
 def _hikvision_configured():
-    return bool(os.getenv("HIKVISION_DOORBELL_HOST")) and bool(
-        os.getenv("HIKVISION_DOORBELL_USER")
-    )
+    return bool(os.getenv("HIKVISION_DOORBELL_HOST")) and bool(os.getenv("HIKVISION_DOORBELL_USER"))
 
 
 pytestmark = pytest.mark.skipif(
