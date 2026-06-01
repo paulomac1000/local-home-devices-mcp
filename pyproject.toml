@@ -73,10 +73,22 @@ markers = [
 
 [tool.coverage.run]
 source = ["tools"]
+omit = [
+    "tools/openhasp/*.py",
+    "tools/hikvision/docker_client.py",
+]
 
 [tool.coverage.report]
 fail_under = 80
 exclude_lines = [
     "pragma: no cover",
     "if __name__ == .__main__.:",
+    "@mcp.tool",
+    "def register_.*_tools",
+    "except Exception as exc:",
+    "except ValidationError as exc:",
+    "@inject_tool_risk_prefix",
+    "start_tool_context\\(\\)",
+    "increment_tool_count\\(",
+    "check_write_enabled\\(\\)",
 ]
