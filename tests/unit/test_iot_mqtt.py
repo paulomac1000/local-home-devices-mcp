@@ -276,7 +276,7 @@ class TestMqttRegistrationWrappers:
     def test_iot_mqtt_build_command_topic_wrapper(self, mock_mcp):
         register_iot_mqtt_tools(mock_mcp)
         fn = mock_mcp.get_tool("iot_mqtt_build_command_topic")
-        result = fn("tasmota_test")
+        result = fn("device_test")
         data = json.loads(result)
         assert data["success"] is True
         assert "command_topic" in data["data"]

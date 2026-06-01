@@ -1,4 +1,4 @@
-# AGENTS.md — tasmota-openbk-mcp
+# AGENTS.md — local-home-devices-mcp
 
 > Rules and conventions for maintaining this MCP server for IoT device management.
 > Aligned with ha-mcp-readonly standards.
@@ -57,10 +57,10 @@ def register_iot_control_tools(mcp):
 
 | Suite | Location | Runtime | Requires | Tests | Run with |
 |-------|----------|---------|----------|-------|----------|
-| Unit | `tests/unit/` | <1s | Nothing | 130 | `pytest tests/unit/ -q` |
+| Unit | `tests/unit/` | <1s | Nothing | 322 | `pytest tests/unit/ -q` |
 | Smoke | `tests/smoke/` | <5s | Running MCP server (localhost:9102) | 17 | `pytest tests/smoke/ -q` |
-| Integration | `tests/integration/` | ~60s | Real MQTT broker (`MQTT_BROKER` env) | 20 | `pytest tests/integration/ -q` |
-| E2E | `tests/e2e/` | <10s | Running MCP server (localhost:9102) | 6 | `pytest tests/e2e/ -q` |
+| Integration | `tests/integration/` | ~60s | Real MQTT broker (`MQTT_BROKER` env) | 68 | `pytest tests/integration/ -q` |
+| E2E | `tests/e2e/` | <10s | Running MCP server (localhost:9102) | 19 | `pytest tests/e2e/ -q` |
 
 ## Test Rules
 
@@ -116,7 +116,7 @@ def register_iot_control_tools(mcp):
 | Smoke | 0% | Tests external server process over HTTP — coverage.py cannot trace |
 | E2E | 0% | Same as smoke — validates response format, not line coverage |
 
-Per-module unit coverage: all 4 modules >80% (`iot_control.py`, `iot_devices.py`, `iot_discovery.py`, `iot_mqtt.py`).
+Per-module unit coverage: all modules >80% (`iot_control.py`, `iot_devices.py`, `iot_discovery.py`, `iot_mqtt.py`, `iot_meta.py`, `iot_tuya.py`, `iot_openhasp.py`, `iot_hikvision.py`, `openhasp/`, `hikvision/`, `validators.py`, `constants.py`).
 
 ## Code Quality
 
@@ -152,7 +152,7 @@ Error responses must include actionable fields:
 ## File Organization
 
 ```
-tasmota-openbk-mcp/
+local-home-devices-mcp/
 ├── server.py                    # Main entry point + REST API + health check
 ├── Dockerfile                   # Production image (no test files)
 ├── docker-compose.yml           # Deployment config
@@ -163,30 +163,50 @@ tasmota-openbk-mcp/
 ├── CHANGELOG.md                 # Version history
 ├── tools/
 │   ├── __init__.py
+│   ├── __main__.py
 │   ├── constants.py             # SSOT for shared configuration defaults
+│   ├── validators.py            # Input validation
 │   ├── iot_control.py           # Power/brightness/restart/WiFi (4 tools)
 │   ├── iot_devices.py           # Device info/power (2 tools)
 │   ├── iot_discovery.py         # Network scan/discovery/cache (4 tools)
-│   └── iot_mqtt.py              # MQTT publish/state/topic (3 tools)
+│   ├── iot_mqtt.py              # MQTT publish/state/topic (3 tools)
+│   ├── iot_meta.py              # Capability introspection (1 tool)
+│   ├── iot_tuya.py              # Tuya cloud + local control (10 tools)
+│   ├── iot_openhasp.py          # OpenHASP panel tools (20 tools)
+│   ├── iot_hikvision.py         # Hikvision doorbell tools (7 tools)
+│   ├── openhasp/                # OpenHASP sub-package (HTTP, Telnet, diagnostics)
+│   └── hikvision/               # Hikvision sub-package (ISAPI, Docker)
 ├── tests/
 │   ├── conftest.py              # Root: env loading only (~30 lines)
 │   ├── fixtures.py              # Mock data constants (MOCK_TASMOTA_DEVICE, etc.)
 │   ├── unit/                    # Unit tests (zero I/O, fully mocked)
 │   │   ├── conftest.py          # Unit fixtures (mock_mcp, mock_requests)
-│   │   ├── test_iot_control.py  # 40 tests
-│   │   ├── test_iot_devices.py  # 24 tests
-│   │   ├── test_iot_discovery.py # 48 tests
-│   │   └── test_iot_mqtt.py     # 18 tests
+│   │   ├── test_constants.py    # 20 tests
+│   │   ├── test_validators.py   # 36 tests
+│   │   ├── test_iot_control.py  # 47 tests
+│   │   ├── test_iot_devices.py  # 28 tests
+│   │   ├── test_iot_discovery.py # 49 tests
+│   │   ├── test_iot_mqtt.py     # 20 tests
+│   │   ├── test_iot_meta.py     # 5 tests
+│   │   ├── test_iot_tuya.py     # 38 tests
+│   │   ├── test_openhasp.py     # 36 tests
+│   │   └── test_iot_hikvision.py # 44 tests
 │   ├── smoke/                   # REST API smoke tests
 │   │   ├── conftest.py          # Dynamic skip + REST_API_URL
 │   │   ├── test_connectivity.py # 3 tests
 │   │   └── test_critical_tools.py # 14 tests
 │   ├── integration/             # Real MQTT/device tests
 │   │   ├── conftest.py          # MCPWrapper + skip-if marker
-│   │   └── test_real_tools.py   # 20 tests
+│   │   ├── test_real_tools.py   # 20 tests
+│   │   ├── test_openhasp_tools.py # 34 tests
+│   │   └── test_hikvision_tools.py # 7 tests
 │   └── e2e/                     # Full pipeline tests
 │       ├── conftest.py          # Dynamic skip + REST_API_URL
-│       └── test_server_api.py   # 6 tests
+│       ├── test_server_api.py   # 6 tests
+│       ├── test_openhasp_workflow.py # 7 tests
+│       └── test_hikvision_workflow.py # 6 tests
+├── docs/
+│   └── README.md                # User-facing documentation
 └── data/                        # Runtime cache (gitignored)
 ```
 
@@ -195,7 +215,7 @@ tasmota-openbk-mcp/
 - **Per module minimum**: 80% line coverage for each `tools/*.py` file.
 - **Overall**: 80%+ across all Python source files.
 - **New tools**: Must include unit tests covering the success path and the primary error handler, plus exception handlers and registration wrappers.
-- **Critical tools**: `iot_discover_devices`, `iot_set_power`, `iot_mqtt_publish` need unit + integration + smoke tests.
+- **Critical tools**: `iot_discover_devices`, `iot_set_power`, `iot_mqtt_publish`, `iot_tuya_get_dps`, `iot_tuya_set_dp` need unit + integration + smoke tests.
 
 ## CI Pipeline
 

@@ -1,1 +1,1 @@
-"""End-to-end tests for Tasmota-OpenBK-MCP."""
+"""End-to-end tests for local-home-devices-mcp."""

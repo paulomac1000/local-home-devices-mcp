@@ -1,5 +1,5 @@
 """
-Unit test fixtures — mocked dependencies, zero I/O.
+Unit test fixtures - mocked dependencies, zero I/O.
 
 All fixtures use generic names (Tasmota_Test, OpenBK_Test).
 No real devices, credentials, or network calls.

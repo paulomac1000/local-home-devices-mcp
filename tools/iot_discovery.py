@@ -11,6 +11,7 @@ import calendar
 import json
 import os
 import re
+import socket
 import subprocess
 import threading
 import time
@@ -22,6 +23,7 @@ from tools.constants import (
     DEFAULT_NETWORK_RANGE,
     _error_response_extended,
     _success_response,
+    get_logger,
     increment_tool_count,
     inject_tool_risk_prefix,
     start_tool_context,
@@ -178,14 +180,14 @@ def _resolve_ip(identifier: str) -> str | None:
 
 
 def _detect_device_type(ip: str, timeout: int = 5) -> str | None:
-    """Detect if device is OpenBK or Tasmota by probing endpoints.
+    """Detect if device is OpenBK, Tasmota, or Tuya by probing endpoints.
 
     Args:
         ip: IP address of the device to probe.
         timeout: Request timeout in seconds.
 
     Returns:
-        "tasmota", "openbk" or None.
+        "tasmota", "openbk", "tuya" or None.
     """
     try:
         resp = requests.get(
@@ -211,6 +213,42 @@ def _detect_device_type(ip: str, timeout: int = 5) -> str | None:
     except Exception:
         pass
 
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        result = sock.connect_ex((ip, 6668))
+        sock.close()
+        if result == 0:
+            return "tuya"
+    except Exception:
+        pass
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(2)
+        result = sock.connect_ex((ip, 6667))
+        sock.close()
+        if result == 0:
+            return "tuya"
+    except Exception:
+        pass
+
+    try:
+        resp = requests.get(
+            f"http://{ip}/config.json",
+            timeout=timeout,
+            allow_redirects=False,
+        )
+        if resp.status_code == 200:
+            try:
+                data = resp.json()
+                if "hasp" in data:
+                    return "openhasp"
+            except Exception:
+                pass
+    except Exception:
+        pass
+
     return None
 
 
@@ -219,7 +257,7 @@ def _probe_device_info(ip: str, device_type: str, timeout: int = 5) -> dict[str,
 
     Args:
         ip: IP address of the device.
-        device_type: "tasmota" or "openbk".
+        device_type: "tasmota", "openbk", or "tuya".
         timeout: Request timeout in seconds.
 
     Returns:
@@ -293,6 +331,73 @@ def _probe_device_info(ip: str, device_type: str, timeout: int = 5) -> dict[str,
         except Exception:
             pass
 
+    elif device_type == "tuya":
+        info["reachable"] = True
+        try:
+            from tools.iot_tuya import (
+                _find_tuya_in_cache,
+                _get_tuya_local,
+                _load_tuya_devices,
+                _save_tuya_devices,
+            )
+
+            entry = _find_tuya_in_cache(ip)
+            if entry and entry.get("device_id"):
+                info["name"] = entry.get("name", "Tuya_Device")
+                info["device_id"] = entry.get("device_id")
+                info["version"] = f"protocol {entry.get('version', '3.3')}"
+            else:
+                cache = _load_tuya_devices()
+                logger = get_logger("discovery")
+                for did, dev_entry in cache.get("devices", {}).items():
+                    local_key = dev_entry.get("local_key", "")
+                    if not local_key:
+                        continue
+                    version = dev_entry.get("version", 3.3)
+                    device = _get_tuya_local(did, ip, local_key, version)
+                    if device is None:
+                        continue
+                    try:
+                        data = device.status()
+                        if data and "dps" in data and "Error" not in str(data):
+                            cache["devices"][did]["ip"] = ip
+                            _save_tuya_devices(cache)
+                            info["name"] = dev_entry.get("name", "Tuya_Device")
+                            info["device_id"] = did
+                            info["version"] = f"protocol {version}"
+                            logger.info(
+                                "Identified Tuya device %s at %s (%d DPS)",
+                                dev_entry.get("name", did),
+                                ip,
+                                len(data.get("dps", {})),
+                            )
+                            break
+                    except Exception:
+                        continue
+                else:
+                    info["name"] = "Tuya_Device"
+                    info["requires_registration"] = True
+        except Exception:
+            info["name"] = "Tuya_Device"
+            info["requires_registration"] = True
+
+    elif device_type == "openhasp":
+        info["reachable"] = True
+        try:
+            from tools.openhasp.http_client import OpenHASPHTTPClient
+
+            client = OpenHASPHTTPClient(ip, timeout=5)
+            config = client.get_json("/config.json")
+            if config:
+                info["name"] = config.get("mqtt", {}).get("name", "OpenHASP")
+                info["version"] = config.get("hasp", {}).get("version", "unknown")
+                info["bckl"] = config.get("gui", {}).get("bckl", 0)
+                info["objects_count"] = client.count_objects()
+            else:
+                info["name"] = "OpenHASP"
+        except Exception:
+            info["name"] = "OpenHASP"
+
     return info
 
 
@@ -300,7 +405,7 @@ def _scan_network(network_range: str, timeout: int = 5) -> list[str]:
     """Scan network with nmap and return list of alive IPs.
 
     Args:
-        network_range: CIDR range to scan (e.g. "192.168.0.0/24").
+        network_range: CIDR range to scan (e.g. "192.168.1.0/24").
         timeout: Unused (kept for API compatibility).
 
     Returns:
@@ -346,7 +451,7 @@ def _iot_discover_devices(network_range: str | None = None, timeout_seconds: int
     """Discover OpenBK and Tasmota devices on the network using nmap.
 
     Args:
-        network_range: CIDR range to scan (defaults to NETWORK_RANGE env or 192.168.0.0/24).
+        network_range: CIDR range to scan (defaults to NETWORK_RANGE env or 192.168.1.0/24).
         timeout_seconds: Timeout per device probe in seconds.
 
     Returns:
@@ -471,7 +576,7 @@ def _iot_check_device(ip_address: str, timeout_seconds: int = 10) -> str:
                 {
                     "is_iot_device": False,
                     "ip": ip_address,
-                    "note": "No OpenBK or Tasmota device detected at this IP",
+                    "note": "No IoT device detected at this IP",
                 }
             )
 
@@ -528,7 +633,7 @@ def register_iot_discovery_tools(mcp: Any) -> None:
         The default scan range is configured via NETWORK_RANGE, START_IP, and END_IP env vars.
 
         Args:
-            network_range: CIDR range to scan (e.g. "192.168.0.0/24"). Uses env default if not set.
+            network_range: CIDR range to scan (e.g. "192.168.1.0/24"). Uses env default if not set.
             timeout_seconds: Timeout per device probe in seconds (default 10).
 
         Returns:

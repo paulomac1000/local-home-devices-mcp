@@ -14,22 +14,38 @@ from tools.validators import ValidationError
 # ENVIRONMENT CONFIGURATION
 # =============================================================================
 
-MQTT_BROKER = os.getenv("MQTT_BROKER", "192.168.0.101")
+MQTT_BROKER = os.getenv("MQTT_BROKER", "192.168.1.100")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
-START_IP = os.getenv("START_IP", "192.168.0.1")
-END_IP = os.getenv("END_IP", "192.168.0.254")
+MQTT_USER = os.getenv("MQTT_USER", "")
+MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
+START_IP = os.getenv("START_IP", "192.168.1.1")
+END_IP = os.getenv("END_IP", "192.168.1.254")
 NETWORK_RANGE = os.getenv("NETWORK_RANGE")
 MCP_SSE_PORT = int(os.getenv("MCP_SSE_PORT", "9101"))
 REST_API_PORT = int(os.getenv("REST_API_PORT", "9102"))
 
 HEALTH_CHECK_PORT = int(os.getenv("HEALTH_CHECK_PORT", "9100"))
+OPENHASP_DEFAULT_HOST = os.getenv("OPENHASP_DEFAULT_HOST", "192.168.1.100")
+OPENHASP_HTTP_PORT = int(os.getenv("OPENHASP_HTTP_PORT", "80"))
+OPENHASP_TELNET_PORT = int(os.getenv("OPENHASP_TELNET_PORT", "23"))
+OPENHASP_TIMEOUT = int(os.getenv("OPENHASP_TIMEOUT", "10"))
+OPENHASP_TELNET_TIMEOUT = int(os.getenv("OPENHASP_TELNET_TIMEOUT", "5"))
+HIKVISION_DOORBELL_HOST = os.getenv("HIKVISION_DOORBELL_HOST", "192.168.1.101")
+HIKVISION_DOORBELL_USER = os.getenv("HIKVISION_DOORBELL_USER", "")
+HIKVISION_DOORBELL_PASSWORD = os.getenv("HIKVISION_DOORBELL_PASSWORD", "")
+HIKVISION_CONTAINER_NAME = os.getenv("HIKVISION_CONTAINER_NAME", "hikvision-doorbell")
+DOCKER_SOCKET = os.getenv("DOCKER_SOCKET", "/var/run/docker.sock")
+TUYA_ACCESS_ID = os.getenv("TUYA_ACCESS_ID", "")
+TUYA_ACCESS_SECRET = os.getenv("TUYA_ACCESS_SECRET", "")
+TUYA_PROJECT_CODE = os.getenv("TUYA_PROJECT_CODE", "")
+TUYA_DEVICES_FILE = os.getenv("TUYA_DEVICES_FILE", "data/tuya_devices.json")
 
 BIND_HOST = os.getenv("BIND_HOST", "127.0.0.1")
 ALLOW_PUBLIC_BIND = os.getenv("MCP_UNSAFE_PUBLIC_ACCESS_CONFIRMED", "0") == "1"
 
 # Server-level write guard. Write and destructive tools are rejected before any
 # I/O unless this flag is explicitly enabled. This is a server-level authorization
-# gate decided by the operator — distinct from the per-tool `requires_confirmation`
+# gate decided by the operator - distinct from the per-tool `requires_confirmation`
 # manifest field, which is an agent-level user-consent hint.
 ENABLE_WRITE_OPERATIONS = os.getenv("ENABLE_WRITE_OPERATIONS", "0") == "1"
 
@@ -37,7 +53,7 @@ ENABLE_WRITE_OPERATIONS = os.getenv("ENABLE_WRITE_OPERATIONS", "0") == "1"
 _DEFAULT_OCTETS = START_IP.rsplit(".", 1)[0]
 DEFAULT_NETWORK_RANGE = NETWORK_RANGE or f"{_DEFAULT_OCTETS}.0/24"
 
-TOOLS_VERSION = "1.3.0"
+TOOLS_VERSION = "1.4.0"
 
 # =============================================================================
 # TOOL INVOCATION COUNTERS
@@ -71,7 +87,7 @@ def get_tool_counts() -> dict[str, int]:
 _LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 _LOGGER_INITIALIZED = False
 
-# Credential patterns are redacted everywhere — in log output AND in the response
+# Credential patterns are redacted everywhere - in log output AND in the response
 # payload returned to the agent.
 _CREDENTIAL_PATTERNS = [
     (r"Bearer\s+[A-Za-z0-9\-._~+/]+=*", "Bearer <REDACTED>"),
@@ -79,9 +95,22 @@ _CREDENTIAL_PATTERNS = [
     (r"password[=:]\s*[^\s&]+", "password=<REDACTED>"),
 ]
 
+_SENSITIVE_RESPONSE_FIELDS = {
+    "access_key",
+    "access_secret",
+    "api_key",
+    "apikey",
+    "authorization",
+    "bearer",
+    "local_key",
+    "password",
+    "secret",
+    "token",
+}
+
 # IP redaction applies to LOG output only. Device IP addresses are functional
-# payload for an IoT discovery server — an agent needs them to address devices in
-# follow-up calls — so they are intentionally NOT redacted from response payloads.
+# payload for an IoT discovery server - an agent needs them to address devices in
+# follow-up calls - so they are intentionally NOT redacted from response payloads.
 _LOG_PATTERNS = _CREDENTIAL_PATTERNS + [
     (r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "<IP_REDACTED>"),
 ]
@@ -113,7 +142,7 @@ def sanitize_response_data(data: Any) -> Any:
 
     Applied at the `_success_response()` boundary so a tool that forgets to
     sanitize cannot leak a token or password to the agent. Device IP addresses
-    are preserved — they are functional data, not secrets.
+    are preserved - they are functional data, not secrets.
 
     Args:
         data: Arbitrary response payload (str, dict, list, or scalar).
@@ -124,7 +153,18 @@ def sanitize_response_data(data: Any) -> Any:
     if isinstance(data, str):
         return _sanitize_secrets(data)
     if isinstance(data, dict):
-        return {k: sanitize_response_data(v) for k, v in data.items()}
+        sanitized = {}
+        for k, v in data.items():
+            normalized_key = str(k).lower().replace("-", "_")
+            is_sensitive_key = (
+                normalized_key in _SENSITIVE_RESPONSE_FIELDS
+                or normalized_key.endswith("_key")
+                or normalized_key.endswith("_password")
+                or normalized_key.endswith("_secret")
+                or normalized_key.endswith("_token")
+            )
+            sanitized[k] = "<REDACTED>" if is_sensitive_key else sanitize_response_data(v)
+        return sanitized
     if isinstance(data, list):
         return [sanitize_response_data(item) for item in data]
     return data
@@ -489,7 +529,7 @@ def _make_destructive_manifest(
 ) -> dict[str, Any]:
     """Build a DESTRUCTIVE-tool manifest for irreversible operations.
 
-    Use for reboot, factory reset, delete — operations whose effect cannot be
+    Use for reboot, factory reset, delete - operations whose effect cannot be
     undone at the application level. The manifest advertises
     retryable=false / reversible=false so the agent never re-issues them blindly.
 
@@ -584,6 +624,149 @@ TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
         cost="cheap",
         determinism="deterministic",
         side_effects="none",
+    ),
+    "iot_tuya_cloud_list": _make_manifest(
+        "iot_tuya_cloud_list",
+        timeout_ms=30000,
+        latency="slow",
+        cost="moderate",
+        privacy="metadata",
+    ),
+    "iot_tuya_cloud_refresh_keys": _make_write_manifest(
+        "iot_tuya_cloud_refresh_keys",
+        timeout_ms=30000,
+        latency="slow",
+        impact="persistent",
+    ),
+    "iot_tuya_cloud_control": _make_write_manifest(
+        "iot_tuya_cloud_control",
+        timeout_ms=15000,
+        latency="slow",
+    ),
+    "iot_tuya_get_dps": _make_manifest(
+        "iot_tuya_get_dps",
+        timeout_ms=10000,
+        privacy="metadata",
+    ),
+    "iot_tuya_set_dp": _make_write_manifest(
+        "iot_tuya_set_dp",
+        timeout_ms=10000,
+    ),
+    "iot_tuya_detect_version": _make_manifest(
+        "iot_tuya_detect_version",
+        timeout_ms=30000,
+        latency="slow",
+        cost="expensive",
+    ),
+    "iot_tuya_verify_dps": _make_manifest(
+        "iot_tuya_verify_dps",
+        timeout_ms=15000,
+        privacy="metadata",
+    ),
+    "iot_tuya_scan_ports": _make_manifest(
+        "iot_tuya_scan_ports",
+        timeout_ms=30000,
+        latency="slow",
+        cost="moderate",
+    ),
+    "iot_tuya_remove": _make_write_manifest(
+        "iot_tuya_remove",
+        timeout_ms=2000,
+        latency="fast",
+        impact="persistent",
+    ),
+    "iot_tuya_monitor": _make_manifest(
+        "iot_tuya_monitor",
+        timeout_ms=120000,
+        latency="slow",
+        cost="expensive",
+        privacy="metadata",
+    ),
+    "openhasp_detect": _make_manifest(
+        "openhasp_detect", timeout_ms=5000, latency="fast", cost="cheap"
+    ),
+    "openhasp_status": _make_manifest("openhasp_status", timeout_ms=15000, privacy="metadata"),
+    "openhasp_check_backlight": _make_manifest(
+        "openhasp_check_backlight", timeout_ms=5000, privacy="metadata"
+    ),
+    "openhasp_get_config": _make_manifest(
+        "openhasp_get_config", timeout_ms=5000, privacy="metadata"
+    ),
+    "openhasp_get_pages": _make_manifest("openhasp_get_pages", timeout_ms=5000, privacy="personal"),
+    "openhasp_screenshot": _make_manifest(
+        "openhasp_screenshot", timeout_ms=30000, latency="slow", cost="expensive"
+    ),
+    "openhasp_download_file": _make_manifest("openhasp_download_file", timeout_ms=10000),
+    "openhasp_upload_file": _make_write_manifest(
+        "openhasp_upload_file", timeout_ms=30000, latency="slow"
+    ),
+    "openhasp_ota_update": _make_destructive_manifest(
+        "openhasp_ota_update", timeout_ms=60000, latency="slow"
+    ),
+    "openhasp_page_set": _make_write_manifest("openhasp_page_set", timeout_ms=5000, latency="fast"),
+    "openhasp_jsonl_send": _make_write_manifest(
+        "openhasp_jsonl_send", timeout_ms=5000, latency="fast"
+    ),
+    "openhasp_telnet": _make_write_manifest("openhasp_telnet", timeout_ms=10000),
+    "openhasp_backlight_set": _make_write_manifest("openhasp_backlight_set", timeout_ms=10000),
+    "openhasp_config_set": _make_write_manifest("openhasp_config_set", timeout_ms=10000),
+    "openhasp_idle_reset": _make_write_manifest(
+        "openhasp_idle_reset", timeout_ms=5000, latency="fast"
+    ),
+    "openhasp_restart": _make_destructive_manifest(
+        "openhasp_restart", timeout_ms=15000, latency="slow"
+    ),
+    "openhasp_factory_reset": _make_destructive_manifest(
+        "openhasp_factory_reset", timeout_ms=15000, latency="slow", impact="persistent"
+    ),
+    "openhasp_validate_config": _make_manifest("openhasp_validate_config", timeout_ms=10000),
+    "openhasp_health": _make_manifest("openhasp_health", timeout_ms=15000, privacy="metadata"),
+    "openhasp_hardware_test": _make_write_manifest(
+        "openhasp_hardware_test", timeout_ms=45000, latency="slow", cost="expensive"
+    ),
+    "hikvision_container_status": _make_manifest(
+        "hikvision_container_status",
+        timeout_ms=10000,
+        latency="fast",
+        cost="cheap",
+    ),
+    "hikvision_container_logs": _make_manifest(
+        "hikvision_container_logs",
+        timeout_ms=15000,
+        latency="fast",
+        privacy="metadata",
+    ),
+    "hikvision_check_vmd": _make_manifest(
+        "hikvision_check_vmd",
+        timeout_ms=15000,
+        latency="fast",
+        cost="cheap",
+        privacy="metadata",
+    ),
+    "hikvision_restart_container": _make_destructive_manifest(
+        "hikvision_restart_container",
+        timeout_ms=30000,
+        latency="slow",
+    ),
+    "hikvision_take_snapshot": _make_manifest(
+        "hikvision_take_snapshot",
+        timeout_ms=15000,
+        latency="moderate",
+        cost="expensive",
+        privacy="personal",
+    ),
+    "hikvision_open_gate": _make_write_manifest(
+        "hikvision_open_gate",
+        timeout_ms=15000,
+        latency="moderate",
+        impact="transient",
+    ),
+    "hikvision_device_info": _make_manifest(
+        "hikvision_device_info",
+        timeout_ms=10000,
+        latency="fast",
+        cost="cheap",
+        privacy="metadata",
     ),
 }
 

@@ -1,6 +1,8 @@
 """Input validation for MCP IoT tools."""
 
+import json
 import re
+from urllib.parse import urlparse
 
 
 class ValidationError(Exception):
@@ -101,7 +103,7 @@ def validate_cidr(cidr: str | None) -> str:
     """Validate a CIDR notation network range.
 
     Args:
-        cidr: CIDR string (e.g. "192.168.0.0/24") or None.
+        cidr: CIDR string (e.g. "192.168.1.0/24") or None.
 
     Returns:
         The trimmed CIDR string.
@@ -114,7 +116,7 @@ def validate_cidr(cidr: str | None) -> str:
     cidr = cidr.strip()
     m = _CIDR_RE.match(cidr)
     if not m:
-        raise ValidationError(f"Invalid CIDR notation: {cidr!r}. Expected format: 192.168.0.0/24")
+        raise ValidationError(f"Invalid CIDR notation: {cidr!r}. Expected format: 192.168.1.0/24")
     prefix = int(m.group(1))
     if not 0 <= prefix <= 32:
         raise ValidationError(f"Invalid CIDR prefix length: {prefix}. Must be 0-32")
@@ -123,3 +125,75 @@ def validate_cidr(cidr: str | None) -> str:
         if not 0 <= int(octet) <= 255:
             raise ValidationError(f"Invalid IP octet in CIDR: {cidr!r}. Each octet must be 0-255")
     return cidr
+
+
+_OPENHASP_TELNET_ALLOWLIST = [
+    re.compile(r"^backlight(?:\s+(?:on|off|[0-9]{1,3}))?$"),
+    re.compile(r"^idle\s+off$"),
+    re.compile(r"^page\s+(?:[1-9]|1[0-2])$"),
+    re.compile(r"^statusupdate$"),
+]
+
+
+def validate_openhasp_telnet_command(command: str | None) -> str:
+    """Validate a raw OpenHASP Telnet command against a strict allowlist.
+
+    Args:
+        command: Raw Telnet command from the tool caller.
+
+    Returns:
+        The trimmed command.
+
+    Raises:
+        ValidationError: If the command is empty or not explicitly allowed.
+    """
+    command = validate_required_string(command, "command")
+    if any(pattern.fullmatch(command) for pattern in _OPENHASP_TELNET_ALLOWLIST):
+        return command
+    raise ValidationError(
+        "Command is not allowed. Use one of: backlight, backlight on/off/0-255, "
+        "idle off, page 1-12, statusupdate."
+    )
+
+
+def validate_json_object(text: str | None, name: str) -> str:
+    """Validate that a string contains a JSON object.
+
+    Args:
+        text: JSON text to validate.
+        name: Parameter name for error messages.
+
+    Returns:
+        The original text if valid.
+
+    Raises:
+        ValidationError: If the text is empty, invalid JSON, or not an object.
+    """
+    text = validate_required_string(text, name)
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ValidationError(f"{name} must be valid JSON") from exc
+    if not isinstance(parsed, dict):
+        raise ValidationError(f"{name} must be a JSON object")
+    return text
+
+
+def validate_http_url(value: str | None, name: str) -> str:
+    """Validate that a string is an HTTP or HTTPS URL.
+
+    Args:
+        value: URL string to validate.
+        name: Parameter name for error messages.
+
+    Returns:
+        The trimmed URL.
+
+    Raises:
+        ValidationError: If the URL is empty or not HTTP(S).
+    """
+    value = validate_required_string(value, name)
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValidationError(f"{name} must be an HTTP or HTTPS URL")
+    return value

@@ -5,7 +5,7 @@ IoT Capability Introspection Tool
 Exposes the tool catalog and manifests over the MCP transport itself, so that
 agents connected over pure SSE can inspect capability metadata without invoking
 each tool. The REST /api/tools/{name}/manifest endpoint is unreachable for such
-agents — this tool closes that gap.
+agents - this tool closes that gap.
 """
 
 from typing import Any

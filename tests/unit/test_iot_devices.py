@@ -97,7 +97,7 @@ class TestGetTasmotaStatus:
                         "Status": {
                             "FriendlyName": ["TestDevice"],
                             "DeviceName": "TestDevice",
-                            "Topic": "tasmota_test",
+                            "Topic": "device_test",
                             "Power": 1,
                             "Version": "12.5.0",
                             "Module": 0,

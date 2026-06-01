@@ -1,4 +1,4 @@
-"""Smoke test conftest — direct HTTP calls to REST API, no MCP wrapper needed."""
+"""Smoke test conftest - direct HTTP calls to REST API, no MCP wrapper needed."""
 
 import os
 import socket

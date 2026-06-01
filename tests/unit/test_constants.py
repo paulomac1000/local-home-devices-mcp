@@ -1,4 +1,4 @@
-"""Unit tests for constants module — response helpers, logging, manifests."""
+"""Unit tests for constants module - response helpers, logging, manifests."""
 
 import json
 
@@ -28,7 +28,7 @@ class TestResponseHelpers:
         assert data["data"] == {"key": "value"}
         assert "_meta" in data
         assert "request_id" in data["_meta"]
-        assert data["_meta"]["tool_version"] == "1.3.0"
+        assert data["_meta"]["tool_version"] == "1.4.0"
 
     def test_success_response_with_list(self):
         result = _success_response([1, 2, 3])
@@ -75,11 +75,11 @@ class TestResponseHelpers:
 
         rid = start_tool_context()
         meta = _build_meta()
-        # request_id must be the id set at tool entry, not a fresh UUID — so it
+        # request_id must be the id set at tool entry, not a fresh UUID - so it
         # correlates with the log lines for the same invocation.
         assert meta["request_id"] == rid
         assert len(meta["request_id"]) == 36  # UUID length
-        assert meta["tool_version"] == "1.3.0"
+        assert meta["tool_version"] == "1.4.0"
 
     def test_build_meta_with_extra(self):
         meta = _build_meta(cached=True, duration_ms=42)
@@ -198,7 +198,7 @@ class TestRiskConsistencyMatrix:
         from tools.constants import TOOL_MANIFESTS
 
         manifest = TOOL_MANIFESTS["iot_restart_device"]
-        # A device reboot has a fixed command set — it is DESTRUCTIVE, never
+        # A device reboot has a fixed command set - it is DESTRUCTIVE, never
         # DANGEROUS (which is reserved for arbitrary shell execution).
         assert manifest["risk"] == "DESTRUCTIVE"
         assert manifest["reversible"] is False
@@ -214,7 +214,7 @@ class TestSanitizeResponseData:
         assert "REDACTED" in result
 
     def test_redacts_password_url_pattern_in_string(self):
-        result = sanitize_response_data("https://host?password=secret123&user=admin")
+        result = sanitize_response_data("https://host?password=secret123&user=test_user")
         assert "secret123" not in result
         assert "REDACTED" in result
 
@@ -225,6 +225,20 @@ class TestSanitizeResponseData:
         assert result["wifi"]["ssid"] == "net"
         assert "abc" not in result["wifi"]["url"]
         assert "REDACTED" in result["wifi"]["url"]
+
+    def test_redacts_sensitive_field_names(self):
+        result = sanitize_response_data(
+            {
+                "device_id": "device-1",
+                "local_key": "abc123def4567890",
+                "access_secret": "secret-value",
+                "api_key": "api-value",
+            }
+        )
+        assert result["device_id"] == "device-1"
+        assert result["local_key"] == "<REDACTED>"
+        assert result["access_secret"] == "<REDACTED>"
+        assert result["api_key"] == "<REDACTED>"
 
     def test_redacts_in_list(self):
         result = sanitize_response_data(["Bearer tok123", "normal text"])

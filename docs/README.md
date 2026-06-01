@@ -1,4 +1,4 @@
-# Tasmota-OpenBK-MCP Documentation
+# Local Home Devices MCP Documentation
 
 > MCP (Model Context Protocol) server for IoT device management.
 > Supports OpenBK (OpenBeken) and Tasmota devices.
@@ -22,29 +22,29 @@
 
 ## Overview
 
-Tasmota-OpenBK-MCP is a Model Context Protocol server that discovers and controls IoT devices on your local network. It supports two popular open-source firmware platforms:
+Local Home Devices MCP is a Model Context Protocol server that discovers and controls IoT devices on your local network. It supports two popular open-source firmware platforms:
 
-- **OpenBK (OpenBeken)** — For BK7231N/T, XR809, BL602 chips
-- **Tasmota** — For ESP8266, ESP32 chips
+- **OpenBK (OpenBeken)** - For BK7231N/T, XR809, BL602 chips
+- **Tasmota** - For ESP8266, ESP32 chips
 
 **Key features:**
-- **Automatic device discovery** — Network scan finds all compatible devices
-- **HTTP + MQTT control** — Direct HTTP API or MQTT broker integration
-- **Read-only by default** — Status and info tools; control tools explicitly named
-- **Standalone** — Single Python process, no external databases
+- **Automatic device discovery** - Network scan finds all compatible devices
+- **HTTP + MQTT control** - Direct HTTP API or MQTT broker integration
+- **Read-only by default** - Status and info tools; control tools explicitly named
+- **Standalone** - Single Python process, no external databases
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────┐      ┌──────────────────────┐      ┌─────────────────┐
-│  MCP Client     │      │  Tasmota-OpenBK-MCP  │      │  IoT Devices    │
-│  (LibreChat,    │◄────►│  Port 9100-9102      │◄────►│  (HTTP/MQTT)    │
-│   Claude, etc.) │ MCP   │  - Health (9100)     │      │  OpenBK/Tasmota │
-│                 │ SSE   │  - MCP SSE (9101)    │      │                 │
-│                 │       │  - REST API (9102)   │      │  MQTT Broker    │
-└─────────────────┘       └──────────────────────┘      └─────────────────┘
++-----------------+      +----------------------+      +-----------------+
+|  MCP Client     |      |  Local Home Devices MCP |      |  IoT Devices    |
+|  (LibreChat,    |<------>|  Port 9100-9102      |<------>|  (HTTP/MQTT)    |
+|   Claude, etc.) | MCP   |  - Health (9100)     |      |  OpenBK/Tasmota |
+|                 | SSE   |  - MCP SSE (9101)    |      |                 |
+|                 |       |  - REST API (9102)   |      |  MQTT Broker    |
++-----------------+       +----------------------+      +-----------------+
 ```
 
 | Port | Protocol | Purpose |
@@ -60,8 +60,8 @@ Tasmota-OpenBK-MCP is a Model Context Protocol server that discovers and control
 ### Prerequisites
 
 - Docker and Docker Compose
-- MQTT broker (e.g., Mosquitto) accessible on your network
 - OpenBK or Tasmota devices on the same local network
+- MQTT broker (e.g., Mosquitto) - optional, required only for MQTT tools
 
 ### 1. Configure
 
@@ -77,13 +77,13 @@ cp .env.example .env
 docker compose up -d
 
 # Option B: Build locally
-docker build -t tasmota-openbk-mcp .
+docker build -t local-home-devices-mcp .
 docker run -d --network host \
-  -e MQTT_BROKER=192.168.0.101 \
-  -e START_IP=192.168.0.1 \
-  -e END_IP=192.168.0.254 \
-  -v tasmota-data:/app/data \
-  tasmota-openbk-mcp
+  -e MQTT_BROKER=192.168.1.100 \
+  -e START_IP=192.168.1.1 \
+  -e END_IP=192.168.1.254 \
+  -v local-home-devices-data:/app/data \
+  local-home-devices-mcp
 ```
 
 ### 3. Verify
@@ -102,24 +102,33 @@ curl http://localhost:9102/api/tools
 
 All configuration via environment variables. See `.env.example` for a complete template.
 
-### Required
+### Required for MQTT tools (optional otherwise)
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `MQTT_BROKER` | MQTT broker IP address | `192.168.0.101` |
+| `MQTT_BROKER` | MQTT broker IP address | `192.168.1.100` |
 
 ### Optional
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `START_IP` | `192.168.0.1` | First IP in the nmap scan range |
-| `END_IP` | `192.168.0.254` | Last IP in the nmap scan range |
-| `NETWORK_RANGE` | `192.168.0.0/24` | CIDR range for scanning (overrides START_IP/END_IP if set) |
+| `START_IP` | `192.168.1.1` | First IP in the nmap scan range |
+| `END_IP` | `192.168.1.254` | Last IP in the nmap scan range |
+| `NETWORK_RANGE` | `192.168.1.0/24` | CIDR range for scanning (overrides START_IP/END_IP if set) |
 | `MQTT_PORT` | `1883` | MQTT broker port |
-| `MQTT_USER` | — | MQTT username (if authentication enabled) |
-| `MQTT_PASSWORD` | — | MQTT password (if authentication enabled) |
+| `MQTT_USER` | - | MQTT username (if authentication enabled) |
+| `MQTT_PASSWORD` | - | MQTT password (if authentication enabled) |
 | `MCP_SSE_PORT` | `9101` | MCP SSE transport port |
 | `REST_API_PORT` | `9102` | REST API port |
+
+### Tuya Cloud (optional)
+
+| Variable | Description |
+|----------|-------------|
+| `TUYA_ACCESS_ID` | Tuya cloud Access ID from iot.tuya.com |
+| `TUYA_ACCESS_SECRET` | Tuya cloud Access Secret |
+| `TUYA_PROJECT_CODE` | Tuya cloud Project Code |
+| `TUYA_DEVICES_FILE` | Local cache path (default: `data/tuya_devices.json`) |
 
 ---
 
@@ -155,6 +164,21 @@ All configuration via environment variables. See `.env.example` for a complete t
 | `iot_mqtt_publish` | Publish a command to a device via MQTT |
 | `iot_mqtt_get_state` | Get device state from MQTT broker |
 | `iot_mqtt_build_command_topic` | Build the MQTT command topic for a device |
+
+### Tuya Devices
+
+| Tool | Description |
+|------|-------------|
+| `iot_tuya_cloud_list` | List all Tuya devices from cloud account |
+| `iot_tuya_cloud_refresh_keys` | Fetch local keys from cloud and cache locally |
+| `iot_tuya_cloud_control` | Control a device via cloud API |
+| `iot_tuya_get_dps` | Get DPS (Data Points) from a Tuya device (local + cloud fallback) |
+| `iot_tuya_set_dp` | Set a DPS value on a Tuya device |
+| `iot_tuya_detect_version` | Auto-detect Tuya protocol version |
+| `iot_tuya_verify_dps` | Verify DPS values against known specification |
+| `iot_tuya_scan_ports` | Scan network for open Tuya TCP ports (6666-6668) |
+| `iot_tuya_remove` | Remove a device from local cache |
+| `iot_tuya_monitor` | Monitor DPS changes in real-time (debugging) |
 
 ---
 
@@ -204,17 +228,43 @@ curl -X POST http://localhost:9102/api/tools/iot_discover_devices \
 
 **API**: `http://{ip}/cm?cmnd={command}` for control
 
+### Tuya
+
+| Chip | Devices |
+|------|---------|
+| ESP8266 | Lights, switches, vacuums, kettles |
+| ESP32 | Lights, switches, sensors |
+| BK7231N/T | Lights, switches, sensors, water valves |
+
+**Detection**: TCP port 6668 open on local network
+
+**API**: Encrypted TCP/UDP via `tinytuya` library, cloud API fallback via `api.tuya.com`
+
+**Requirements**: Tuya cloud API credentials (Access ID, Access Secret) for local key retrieval
+
+### Hikvision Doorbell
+
+| Model | Devices |
+|-------|---------|
+| DS-KV6113-WPE1(C) | Video doorbell with electric gate relay |
+
+**Detection**: Fixed IP `HIKVISION_DOORBELL_HOST` (not auto-discovered)
+
+**API**: ISAPI HTTP API with Digest Authentication (XML responses), Docker Unix socket for container management
+
+**Requirements**: Doorbell credentials, Docker socket mount, `hikvision-doorbell` container
+
 ---
 
 ## Testing
 
 ### Unit Tests
 
-No real devices required — all HTTP and MQTT calls are mocked. Runs in CI.
+No real devices required - all HTTP and MQTT calls are mocked. Runs in CI.
 
 ```bash
 pytest tests/unit/ -v --tb=short
-# 130 tests, 100% line coverage
+# Unit tests with >80% line coverage
 ```
 
 ### Smoke Tests
@@ -223,7 +273,7 @@ Direct REST API calls to a running MCP server. Skips if server is not running (d
 
 ```bash
 pytest tests/smoke/ -q
-# 17 tests — health, tools list, critical tools, response format
+# 17 tests - health, tools list, critical tools, response format
 ```
 
 ### Integration Tests
@@ -231,9 +281,9 @@ pytest tests/smoke/ -q
 Real MQTT broker and network scans against real devices. Skips if `MQTT_BROKER` is not configured.
 
 ```bash
-export MQTT_BROKER=192.168.0.101
+export MQTT_BROKER=192.168.1.100
 pytest tests/integration/ -v
-# 20 tests — discovery, device info, MQTT operations, real Tasmota devices
+# Integration tests - discovery, device info, MQTT operations, real devices when configured
 ```
 
 ### E2E Tests
@@ -242,7 +292,7 @@ Full REST API pipeline. Skips if server is not running (dynamic socket check).
 
 ```bash
 pytest tests/e2e/ -q
-# 6 tests — health, tools list, tool calls, error responses
+# E2E tests - health, tools list, tool calls, error responses
 ```
 
 ---
@@ -253,30 +303,34 @@ pytest tests/e2e/ -q
 
 ```
 .
-├── server.py              # Main server (MCP + REST API)
-├── requirements.txt       # Dependencies
-├── Dockerfile             # Container image
-├── docker-compose.yml     # Quick start
-├── .env.example           # Configuration template
-├── CHANGELOG.md           # Version history
-├── AGENTS.md              # Agent instructions
-├── tools/
-│   ├── constants.py       # Shared configuration defaults
-│   ├── iot_discovery.py   # Network scanning and detection
-│   ├── iot_devices.py     # Device info and status
-│   ├── iot_control.py     # Device control (power, brightness)
-│   ├── iot_mqtt.py        # MQTT integration
-│   └── __init__.py
-├── tests/
-│   ├── conftest.py        # Env loading only
-│   ├── fixtures.py        # Mock data constants
-│   ├── unit/              # Unit tests (zero I/O, 130 tests)
-│   ├── smoke/             # REST API smoke tests (17 tests)
-│   ├── integration/       # Real MQTT/device tests (20 tests)
-│   ├── e2e/               # Full pipeline tests (6 tests)
-│   └── __init__.py
-└── docs/
-    └── README.md          # This documentation
++-- server.py              # Main server (MCP + REST API)
++-- requirements.txt       # Dependencies
++-- Dockerfile             # Container image
++-- docker-compose.yml     # Quick start
++-- .env.example           # Configuration template
++-- CHANGELOG.md           # Version history
++-- AGENTS.md              # Agent instructions
++-- tools/
+|   +-- constants.py       # Shared configuration defaults
+|   +-- validators.py      # Input validation
+|   +-- iot_discovery.py   # Network scanning and detection
+|   +-- iot_devices.py     # Device info and status
+|   +-- iot_control.py     # Device control (power, brightness)
+|   +-- iot_mqtt.py        # MQTT integration
+|   +-- iot_meta.py        # Capability introspection
+|   +-- iot_tuya.py        # Tuya cloud + local control
+|   +-- __init__.py
++-- tests/
+|   +-- conftest.py        # Env loading only
+|   +-- fixtures.py        # Mock data constants
+|   +-- unit/              # Unit tests (zero I/O)
+|   +-- smoke/             # REST API smoke tests (17 tests)
+|   +-- integration/       # Real MQTT/device tests
+|   +-- e2e/               # Full pipeline tests
+|   +-- __init__.py
++-- docs/
+|   +-- README.md          # This documentation
++-- data/                  # Runtime cache (gitignored)
 ```
 
 ### Adding Device Support
@@ -324,7 +378,7 @@ Yes. Install dependencies and run directly:
 ```bash
 pip install -r requirements.txt
 # May require: sudo apt-get install nmap
-MQTT_BROKER=192.168.0.101 python server.py
+MQTT_BROKER=192.168.1.100 python server.py
 ```
 
 ### How does device caching work?
@@ -345,9 +399,9 @@ Detection is automatic based on HTTP response patterns.
 ### Devices not discovered
 
 1. Ensure devices are on the same network as the server
-2. Verify nmap is installed: `docker exec tasmota-openbk-mcp nmap --version`
+2. Verify nmap is installed: `docker exec local-home-devices-mcp nmap --version`
 3. Try manual check: `curl http://{device_ip}/cm?cmnd=Status`
-5. **nmap permission issues**: If running locally (not in Docker), nmap may require root. Try: `sudo nmap -sn 192.168.0.0/24`
+5. **nmap permission issues**: If running locally (not in Docker), nmap may require root. Try: `sudo nmap -sn 192.168.1.0/24`
 
 ### nmap scan fails or returns no hosts
 
@@ -362,11 +416,11 @@ Detection is automatic based on HTTP response patterns.
 2. Check MQTT port (default 1883) is not blocked
 3. Ensure MQTT credentials are correct (if authentication enabled)
 4. Verify device is configured with the same MQTT broker
-5. **Note:** Default `MQTT_BROKER=192.168.0.101` is just a placeholder - set your actual broker IP in `.env`
+5. **Note:** Default `MQTT_BROKER=192.168.1.100` is just a placeholder - set your actual broker IP in `.env`
 
 ### Server starts but shows warnings
 
-- The default MQTT broker IP (192.168.0.101) may be unreachable - this is fine unless you need MQTT tools
+- The default MQTT broker IP (192.168.1.100) may be unreachable - this is fine unless you need MQTT tools
 - If you see "Address already in use" on ports 9100-9102, another instance may be running
 
 ### Control commands fail
@@ -380,7 +434,7 @@ Detection is automatic based on HTTP response patterns.
 
 ## License
 
-MIT License — see [LICENSE](../LICENSE) for details.
+MIT License - see [LICENSE](../LICENSE) for details.
 
 ## Contributing
 

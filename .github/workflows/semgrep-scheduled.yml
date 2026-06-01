@@ -34,9 +34,11 @@ jobs:
             p/auto
             p/secrets
             p/owasp-top-ten
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN || '' }}
 
       - name: Upload SARIF to GitHub Security
-        if: always()
+        id: upload-sarif
+        if: always() && hashFiles('semgrep.sarif') != ''
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -45,4 +47,4 @@ jobs:
 
       - name: Warn if SARIF upload failed
         if: always() && steps.upload-sarif.outcome == 'failure'
-        run: echo "::warning::SARIF upload failed — check codeql-action reference or permissions"
+        run: echo "::warning::SARIF upload failed - check codeql-action reference or permissions"

@@ -1,4 +1,4 @@
-"""Integration test conftest — real MQTT broker + devices, skip if not configured."""
+"""Integration test conftest - real MQTT broker + devices, skip if not configured."""
 
 import asyncio
 import inspect
@@ -76,7 +76,10 @@ def mcp_client():
     from tools.iot_control import register_iot_control_tools
     from tools.iot_devices import register_iot_device_tools
     from tools.iot_discovery import register_iot_discovery_tools
+    from tools.iot_hikvision import register_hikvision_tools
     from tools.iot_mqtt import register_iot_mqtt_tools
+    from tools.iot_openhasp import register_openhasp_tools
+    from tools.iot_tuya import register_iot_tuya_tools
 
     # Write-tool error-path tests need the guard enabled so calls reach
     # the tool logic (name resolution, validation) and not the gate.
@@ -87,6 +90,9 @@ def mcp_client():
         register_iot_discovery_tools(mcp)
         register_iot_control_tools(mcp)
         register_iot_mqtt_tools(mcp)
+        register_iot_tuya_tools(mcp)
+        register_openhasp_tools(mcp)
+        register_hikvision_tools(mcp)
 
         yield MCPWrapper(mcp)
 

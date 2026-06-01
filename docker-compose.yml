@@ -1,11 +1,11 @@
 services:
-  tasmota-openbk-mcp:
-    image: ghcr.io/paulomac1000/tasmota-openbk-mcp:latest
+  local-home-devices-mcp:
+    image: ghcr.io/paulomac1000/local-home-devices-mcp:latest
     env_file: .env
     network_mode: host
     volumes:
-      - tasmota-openbk-mcp-data:/app/data
+      - local-home-devices-mcp-data:/app/data
     restart: unless-stopped
 
 volumes:
-  tasmota-openbk-mcp-data:
+  local-home-devices-mcp-data:

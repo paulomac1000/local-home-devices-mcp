@@ -1,5 +1,5 @@
 """
-Root conftest — environment loading only (~30 lines).
+Root conftest - environment loading only (~30 lines).
 No fixtures beyond env setup. Specific fixtures in subdirectory conftest.py files.
 """
 

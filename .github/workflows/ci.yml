@@ -109,30 +109,29 @@ jobs:
         with:
           context: .
           load: true
-          tags: tasmota-openbk-mcp:test
+          tags: local-home-devices-mcp:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke test — tool count
+      - name: Smoke test - tool count
         run: |
-          docker run --rm tasmota-openbk-mcp:test python3 -c "
+          docker run --rm local-home-devices-mcp:test python3 -c "
+          from tools.constants import TOOL_MANIFESTS
           from server import get_tool_count
           tc = get_tool_count()
-          assert tc == 14, f'Expected 14 tools, got {tc}'
+          expected = len(TOOL_MANIFESTS)
+          assert tc == expected, f'Expected {expected} tools, got {tc}'
           print('Tool count OK:', tc)
           "
 
-      - name: Smoke test — REST API health + tools
+      - name: Smoke test - REST API health + tools
         run: |
           docker run -d --rm --network host \
             -e MQTT_BROKER=localhost \
-            --name mcp-smoke tasmota-openbk-mcp:test
+            --name mcp-smoke local-home-devices-mcp:test
           sleep 5
           curl -fsS --retry 10 --retry-delay 2 \
             http://localhost:9100/health || exit 1
-          TOOLS=$(curl -s http://localhost:9102/api/tools \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['total'])")
-          [ "$TOOLS" = "14" ] \
-            || (echo "FAIL: expected 14 tools, got $TOOLS" && exit 1)
-          echo "REST API smoke test OK ($TOOLS tools)"
+          curl -s http://localhost:9102/api/tools \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); assert d['success'] is True; assert d['total'] == d['tool_count'] and d['total'] > 0, d; print('REST API smoke test OK', d['total'], 'tools')"
           docker stop mcp-smoke

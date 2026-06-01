@@ -6,13 +6,14 @@ Interact with IoT devices via MQTT broker.
 """
 
 import json
-import os
 import time
 from typing import Any
 
 from tools.constants import (
     MQTT_BROKER,
+    MQTT_PASSWORD,
     MQTT_PORT,
+    MQTT_USER,
     _error_response_extended,
     _success_response,
     check_write_enabled,
@@ -20,12 +21,9 @@ from tools.constants import (
     inject_tool_risk_prefix,
     start_tool_context,
 )
-from tools.validators import ValidationError
+from tools.validators import ValidationError, validate_required_string
 
 __all__ = ["register_iot_mqtt_tools", "_get_mqtt_client", "_mqtt_publish"]
-
-MQTT_USER = os.getenv("MQTT_USER", "")
-MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
 
 
 def _get_mqtt_client() -> Any:
@@ -57,7 +55,7 @@ def _mqtt_publish(topic: str, payload: str, retain: bool = False, timeout_second
     """Publish an MQTT message.
 
     Args:
-        topic: MQTT topic (e.g. "cmnd/tasmota_389AF7/Power").
+        topic: MQTT topic (e.g. "cmnd/device_389AF7/Power").
         payload: Message payload (e.g. "ON", "OFF", "TOGGLE").
         retain: Whether to retain the message.
         timeout_seconds: MQTT broker connection timeout in seconds.
@@ -65,6 +63,12 @@ def _mqtt_publish(topic: str, payload: str, retain: bool = False, timeout_second
     Returns:
         JSON string with result.
     """
+    try:
+        topic = validate_required_string(topic, "topic")
+        payload = validate_required_string(payload, "payload")
+    except ValidationError as exc:
+        return _error_response_extended(code="INVALID_PARAM", message=str(exc))
+
     client = _get_mqtt_client()
     if not client:
         return _error_response_extended(
@@ -96,12 +100,17 @@ def _mqtt_get_state(topic_prefix: str, timeout_seconds: int = 10) -> str:
     Subscribes to the state topic and returns the latest value.
 
     Args:
-        topic_prefix: Device topic prefix (e.g. "tasmota_389AF7").
+        topic_prefix: Device topic prefix (e.g. "device_389AF7").
         timeout_seconds: How long to wait for state message in seconds.
 
     Returns:
         JSON string with device state.
     """
+    try:
+        topic_prefix = validate_required_string(topic_prefix, "topic_prefix")
+    except ValidationError as exc:
+        return _error_response_extended(code="INVALID_PARAM", message=str(exc))
+
     client = _get_mqtt_client()
     if not client:
         return _error_response_extended(
@@ -158,12 +167,18 @@ def _mqtt_build_command_topic(device_name: str, command: str = "Power") -> str:
     """Build MQTT command topic for a device.
 
     Args:
-        device_name: Device MQTT topic (e.g. "tasmota_389AF7").
+        device_name: Device MQTT topic (e.g. "device_389AF7").
         command: Command name (default "Power").
 
     Returns:
         JSON string with topic information.
     """
+    try:
+        device_name = validate_required_string(device_name, "device_name")
+        command = validate_required_string(command, "command")
+    except ValidationError as exc:
+        return _error_response_extended(code="INVALID_PARAM", message=str(exc))
+
     topic = f"cmnd/{device_name}/{command}"
     state_topic = f"stat/{device_name}/{command}"
     tele_topic = f"tele/{device_name}/STATE"
@@ -197,7 +212,7 @@ def register_iot_mqtt_tools(mcp: Any) -> None:
         """Publish an MQTT message to control an IoT device.
 
         Args:
-            topic: MQTT topic (e.g. "cmnd/tasmota_389AF7/Power").
+            topic: MQTT topic (e.g. "cmnd/device_389AF7/Power").
             payload: Message payload (e.g. "ON", "OFF", "TOGGLE").
             retain: Whether to retain the message (default False).
             timeout_seconds: MQTT broker connection timeout in seconds (default 10).
@@ -230,7 +245,7 @@ def register_iot_mqtt_tools(mcp: Any) -> None:
         Subscribes to the state topic and returns the latest value.
 
         Args:
-            topic_prefix: Device topic prefix (e.g. "tasmota_389AF7").
+            topic_prefix: Device topic prefix (e.g. "device_389AF7").
             timeout_seconds: How long to wait for state message in seconds (default 10).
 
         Returns:
@@ -251,7 +266,7 @@ def register_iot_mqtt_tools(mcp: Any) -> None:
         """Build MQTT command topic for a device.
 
         Args:
-            device_name: Device MQTT topic (e.g. "tasmota_389AF7").
+            device_name: Device MQTT topic (e.g. "device_389AF7").
             command: Command name (default "Power").
 
         Returns:

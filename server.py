@@ -3,7 +3,7 @@
 IoT MCP Server
 
 Model Context Protocol server for IoT device management.
-Supports OpenBK (OpenBeken) and Tasmota devices.
+Supports OpenBK (OpenBeken), Tasmota, Tuya, and OpenHASP devices.
 
 Architecture:
 - Port 9100: Health check (lightweight HTTP server)
@@ -41,8 +41,11 @@ from tools.constants import (
 from tools.iot_control import register_iot_control_tools
 from tools.iot_devices import register_iot_device_tools
 from tools.iot_discovery import register_iot_discovery_tools
+from tools.iot_hikvision import register_hikvision_tools
 from tools.iot_meta import register_iot_meta_tools
 from tools.iot_mqtt import register_iot_mqtt_tools
+from tools.iot_openhasp import register_openhasp_tools
+from tools.iot_tuya import register_iot_tuya_tools
 
 # =============================================================================
 # HEALTH CHECK SERVER (port 9100)
@@ -109,6 +112,9 @@ register_iot_discovery_tools(mcp)
 register_iot_control_tools(mcp)
 register_iot_mqtt_tools(mcp)
 register_iot_meta_tools(mcp)
+register_iot_tuya_tools(mcp)
+register_openhasp_tools(mcp)
+register_hikvision_tools(mcp)
 
 
 # =============================================================================
@@ -157,6 +163,7 @@ def create_rest_app() -> Any:
                 "status": "healthy",
                 "server": "IoT-Observer",
                 "version": TOOLS_VERSION,
+                "tool_count": get_tool_count(),
                 "tools_registered": get_tool_count(),
                 "tool_invocation_counts": get_tool_counts(),
                 "endpoints": {
@@ -181,6 +188,7 @@ def create_rest_app() -> Any:
             {
                 "success": True,
                 "total": len(tool_list),
+                "tool_count": len(tool_list),
                 "tools": sorted(tool_list, key=lambda x: str(x.get("name", ""))),
             }
         )
@@ -235,7 +243,8 @@ def create_rest_app() -> Any:
                 except json.JSONDecodeError:
                     pass
 
-            return JSONResponse({"success": True, "tool": tool_name, "result": result})
+            success = result.get("success", True) if isinstance(result, dict) else True
+            return JSONResponse({"success": bool(success), "tool": tool_name, "result": result})
 
         except TypeError as exc:
             return JSONResponse(
@@ -328,6 +337,7 @@ def main() -> None:
     start_health_server(port=HEALTH_CHECK_PORT)
     HEALTH_STATE["status"] = "healthy"
     HEALTH_STATE["tools"] = tool_count
+    HEALTH_STATE["tool_count"] = tool_count
     HEALTH_STATE["tools_version"] = TOOLS_VERSION
     HEALTH_STATE["last_heartbeat"] = time.time()
 
