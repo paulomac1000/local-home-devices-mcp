@@ -93,7 +93,7 @@ class TestProbeDeviceInfo:
                             "FriendlyName": ["TestDevice"],
                             "Version": "12.5.0",
                             "DeviceName": "TestDevice",
-                            "Topic": "tasmota_test",
+                            "Topic": "device_test",
                             "Module": 0,
                             "PowerOnState": 3,
                         }

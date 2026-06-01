@@ -1,1 +1,1 @@
-"""Unit tests for Tasmota-OpenBK-MCP."""
+"""Unit tests for local-home-devices-mcp."""

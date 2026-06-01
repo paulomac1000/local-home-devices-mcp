@@ -1,5 +1,5 @@
 """
-Mock data constants for Tasmota-OpenBK-MCP tests.
+Mock data constants for Local Home Devices MCP tests.
 
 All mock devices use generic names (Tasmota_Test, OpenBK_Test).
 No real device names, IPs, or credentials.

@@ -6,7 +6,10 @@ from tools.validators import (
     ValidationError,
     validate_brightness,
     validate_channel,
+    validate_http_url,
     validate_ip_format,
+    validate_json_object,
+    validate_openhasp_telnet_command,
     validate_power_state,
     validate_required_string,
 )
@@ -87,3 +90,45 @@ class TestValidateIpFormat:
     def test_invalid_ips(self, ip):
         with pytest.raises(ValidationError, match="Invalid IP address format"):
             validate_ip_format(ip)
+
+
+class TestOpenHASPTelnetCommand:
+    """Tests for OpenHASP raw Telnet allowlist validation."""
+
+    @pytest.mark.parametrize(
+        "command",
+        ["backlight", "backlight on", "backlight 255", "page 1", "statusupdate"],
+    )
+    def test_valid_commands(self, command):
+        assert validate_openhasp_telnet_command(command) == command
+
+    @pytest.mark.parametrize(
+        "command",
+        ["restart", "factoryreset", "update http://example.invalid/a.bin", "jsonl {}", ""],
+    )
+    def test_rejects_unlisted_commands(self, command):
+        with pytest.raises(ValidationError):
+            validate_openhasp_telnet_command(command)
+
+
+class TestStructuredStringValidators:
+    """Tests for JSON object and HTTP URL validators."""
+
+    def test_validate_json_object(self):
+        assert validate_json_object('{"idle1": 20}', "config_json") == '{"idle1": 20}'
+
+    @pytest.mark.parametrize("value", ["[]", "not-json", ""])
+    def test_validate_json_object_rejects_invalid_values(self, value):
+        with pytest.raises(ValidationError):
+            validate_json_object(value, "config_json")
+
+    def test_validate_http_url(self):
+        assert (
+            validate_http_url("https://example.invalid/firmware.bin", "firmware_url")
+            == "https://example.invalid/firmware.bin"
+        )
+
+    @pytest.mark.parametrize("value", ["ftp://example.invalid/a.bin", "/tmp/a.bin", ""])
+    def test_validate_http_url_rejects_invalid_values(self, value):
+        with pytest.raises(ValidationError):
+            validate_http_url(value, "firmware_url")

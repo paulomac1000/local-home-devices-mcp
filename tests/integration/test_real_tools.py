@@ -1,4 +1,4 @@
-"""Integration tests — real MQTT broker and network devices (if available)."""
+"""Integration tests - real MQTT broker and network devices (if available)."""
 
 import json
 import os
@@ -9,7 +9,7 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(
         not bool(os.getenv("MQTT_BROKER")),
-        reason="MQTT_BROKER not configured — skipping integration tests",
+        reason="MQTT_BROKER not configured - skipping integration tests",
     ),
 ]
 
@@ -52,7 +52,7 @@ class TestIntegrationDiscovery:
         assert data.get("success") is True
 
     def test_check_device_router(self, mcp_client):
-        result = mcp_client.call_tool("iot_check_device", ip_address="192.168.0.1")
+        result = mcp_client.call_tool("iot_check_device", ip_address="192.168.1.1")
         data = json.loads(result) if isinstance(result, str) else result
         assert data.get("success") is True
 
@@ -63,7 +63,7 @@ class TestIntegrationDiscovery:
 
 
 class TestIntegrationDeviceInfo:
-    """Device info tools — error paths via MCP wrapper."""
+    """Device info tools - error paths via MCP wrapper."""
 
     def test_get_device_info_name_not_found(self, mcp_client):
         data = _get_result(mcp_client, "iot_get_device_info", identifier="NoSuchDevice_XYZ")
@@ -77,7 +77,7 @@ class TestIntegrationDeviceInfo:
 
 
 class TestIntegrationControlErrors:
-    """Control tools — error paths (no real devices needed)."""
+    """Control tools - error paths (no real devices needed)."""
 
     def test_set_power_name_not_found(self, mcp_client):
         data = _get_result(mcp_client, "iot_set_power", identifier="NoSuchDevice_XYZ", state="ON")
@@ -125,7 +125,7 @@ class TestIntegrationMQTT:
     """MQTT operations against the configured broker."""
 
     def test_build_command_topic(self, mcp_client):
-        data = _get_result(mcp_client, "iot_mqtt_build_command_topic", device_name="tasmota_test")
+        data = _get_result(mcp_client, "iot_mqtt_build_command_topic", device_name="device_test")
         assert data.get("success") is True
 
     def test_mqtt_publish(self, mcp_client):
@@ -155,7 +155,11 @@ class TestIntegrationRealDeviceReadOnly:
         data = _get_result(mcp_client, "iot_list_devices")
         devices = data.get("data", {}).get("devices", [])
         if not devices:
-            pytest.skip("No real devices in cache — CI environment with no Tasmota/OpenBK")
+            pytest.skip("No real devices in cache - CI environment with no Tasmota/OpenBK")
+        dev = _pick_device_name(mcp_client)
+        probe = _get_result(mcp_client, "iot_get_device_info", identifier=dev["name"])
+        if not probe.get("success"):
+            pytest.skip("No reachable real Tasmota/OpenBK device available")
 
     def test_get_device_info_by_real_name(self, mcp_client):
         dev = _pick_device_name(mcp_client)
@@ -182,3 +186,57 @@ class TestIntegrationRealDeviceReadOnly:
         data = _get_result(mcp_client, "iot_find_device_by_name", name=dev["name"])
         assert data["success"] is True
         assert data["data"]["device"]["ip"] == dev["ip"]
+
+
+TUYA_CONFIGURED = bool(os.getenv("TUYA_ACCESS_ID") and os.getenv("TUYA_ACCESS_SECRET"))
+
+tuya_pytestmark = pytest.mark.skipif(
+    not TUYA_CONFIGURED,
+    reason="TUYA_ACCESS_ID/TUYA_ACCESS_SECRET not configured",
+)
+
+
+class TestIntegrationTuya:
+    """Tuya cloud and local integration tests."""
+
+    @tuya_pytestmark
+    def test_cloud_list_returns_devices(self, mcp_client):
+        data = _get_result(mcp_client, "iot_tuya_cloud_list")
+        if not data["success"]:
+            pytest.skip("Tuya cloud is not reachable from this environment")
+        assert data["success"] is True
+        assert data["data"]["devices_found"] > 0
+
+    @tuya_pytestmark
+    def test_cloud_refresh_keys_populates_cache(self, mcp_client):
+        data = _get_result(mcp_client, "iot_tuya_cloud_refresh_keys")
+        if not data["success"]:
+            pytest.skip("Tuya cloud is not reachable from this environment")
+        assert data["success"] is True
+        assert data["data"]["devices_found"] > 0
+
+    @tuya_pytestmark
+    def test_get_dps_cloud_fallback(self, mcp_client):
+        data = _get_result(mcp_client, "iot_tuya_get_dps", identifier="bf15c3339b8b8a71e1oter")
+        assert "success" in data
+
+    @tuya_pytestmark
+    def test_get_dps_nonexistent_device(self, mcp_client):
+        data = _get_result(mcp_client, "iot_tuya_get_dps", identifier="nonexistent_xyz")
+        assert data["success"] is False
+
+    @tuya_pytestmark
+    def test_verify_dps_returns_results(self, mcp_client):
+        data = _get_result(mcp_client, "iot_tuya_verify_dps", identifier="bf5397fdf1491fc79ac2gr")
+        assert "success" in data
+
+    @tuya_pytestmark
+    def test_scan_ports_finds_no_errors(self, mcp_client):
+        data = _get_result(mcp_client, "iot_tuya_scan_ports")
+        assert data["success"] is True
+
+    @tuya_pytestmark
+    def test_remove_nonexistent_device(self, mcp_client):
+        data = _get_result(mcp_client, "iot_tuya_remove", device_id="nonexistent_device_xyz")
+        assert data["success"] is False
+        assert data["error"]["code"] == "TUYA_NOT_FOUND"

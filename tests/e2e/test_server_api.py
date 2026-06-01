@@ -33,7 +33,7 @@ class TestServerAPI:
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
-        assert data["total"] == 13
+        assert data["total"] == 51
         tool_names = [t["name"] for t in data["tools"]]
         assert "iot_discover_devices" in tool_names
         assert "iot_get_device_info" in tool_names

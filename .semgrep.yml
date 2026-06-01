@@ -1,4 +1,4 @@
-# Tasmota-OpenBK-MCP — Semgrep project triage
+# Local Home Devices MCP — Semgrep project triage
 #
 # IoT devices on the local LAN (Tasmota, OpenBK) are HTTP-only —
 # they do not support TLS. The request-with-http rule is a false

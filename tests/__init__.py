@@ -1,1 +1,1 @@
-"""Test suite for Tasmota-OpenBK-MCP."""
+"""Test suite for local-home-devices-mcp."""

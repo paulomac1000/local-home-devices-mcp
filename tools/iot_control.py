@@ -18,7 +18,13 @@ from tools.constants import (
     inject_tool_risk_prefix,
     start_tool_context,
 )
-from tools.validators import ValidationError, validate_brightness, validate_power_state
+from tools.validators import (
+    ValidationError,
+    validate_brightness,
+    validate_channel,
+    validate_power_state,
+    validate_required_string,
+)
 
 __all__ = [
     "register_iot_control_tools",
@@ -61,6 +67,17 @@ def _set_power(identifier: str, state: str, channel: int = 1, timeout_seconds: i
     """
     from tools.iot_discovery import _detect_device_type
 
+    try:
+        identifier = validate_required_string(identifier, "identifier")
+        channel = validate_channel(channel)
+        state = validate_power_state(state)
+    except ValidationError as exc:
+        return _error_response_extended(
+            code="INVALID_PARAM",
+            message=str(exc),
+            suggestion="Use a non-empty identifier, channel >= 1, and state ON, OFF, or TOGGLE.",
+        )
+
     ip_address = _resolve_or_fail(identifier)
     if not ip_address:
         return _build_unresolved_response(identifier)
@@ -70,15 +87,6 @@ def _set_power(identifier: str, state: str, channel: int = 1, timeout_seconds: i
         return _error_response_extended(
             code="DEVICE_NOT_FOUND",
             message=f"No IoT device found at {ip_address} (resolved from '{identifier}')",
-        )
-
-    try:
-        state = validate_power_state(state)
-    except Exception:
-        return _error_response_extended(
-            code="INVALID_PARAM",
-            message=f"Invalid state: {state!r}. Must be ON, OFF, or TOGGLE",
-            suggestion="Use ON, OFF, or TOGGLE",
         )
 
     if device_type == "tasmota":
@@ -124,6 +132,35 @@ def _set_power(identifier: str, state: str, channel: int = 1, timeout_seconds: i
             )
         return _error_response_extended(code="HTTP_ERROR", message=f"HTTP {resp.status_code}")
 
+    if device_type == "tuya":
+        from tools.iot_tuya import _tuya_set_value
+
+        tuya_state = True if state == "ON" else False
+        return _tuya_set_value(identifier, "1", tuya_state)
+
+    if device_type == "openhasp":
+        from tools.openhasp.telnet import OpenHASPTelnet
+
+        tn = OpenHASPTelnet(ip_address)
+        if tn.connect():
+            tn.idle_off()
+            tn.backlight_set("on" if state == "ON" else "off")
+            tn.disconnect()
+            return _success_response(
+                {
+                    "device_type": "openhasp",
+                    "resolved_from": identifier,
+                    "ip": ip_address,
+                    "channel": channel,
+                    "requested_state": state,
+                    "note": "Backlight command sent via Telnet",
+                }
+            )
+        return _error_response_extended(
+            code="DEVICE_UNREACHABLE",
+            message="Telnet connection failed",
+        )
+
     return _error_response_extended(
         code="UNSUPPORTED_TYPE",
         message=f"Unsupported device type: {device_type}",
@@ -146,6 +183,17 @@ def _set_brightness(
     """
     from tools.iot_discovery import _detect_device_type
 
+    try:
+        identifier = validate_required_string(identifier, "identifier")
+        channel = validate_channel(channel)
+        brightness = validate_brightness(brightness)
+    except ValidationError as exc:
+        return _error_response_extended(
+            code="INVALID_PARAM",
+            message=str(exc),
+            suggestion="Use a non-empty identifier, channel >= 1, and brightness 0-100.",
+        )
+
     ip_address = _resolve_or_fail(identifier)
     if not ip_address:
         return _build_unresolved_response(identifier)
@@ -155,14 +203,6 @@ def _set_brightness(
         return _error_response_extended(
             code="DEVICE_NOT_FOUND",
             message=f"No IoT device found at {ip_address}",
-        )
-
-    try:
-        brightness = validate_brightness(brightness)
-    except Exception:
-        return _error_response_extended(
-            code="INVALID_PARAM",
-            message=f"Brightness must be 0-100, got {brightness}",
         )
 
     if device_type == "tasmota":
@@ -197,6 +237,39 @@ def _set_brightness(
                 }
             )
 
+    if device_type == "tuya":
+        from tools.iot_tuya import _find_tuya_in_cache, _tuya_set_value
+
+        entry = _find_tuya_in_cache(identifier)
+        power_dp = entry.get("power_dp_id", "1") if entry else "1"
+        return _tuya_set_value(identifier, power_dp, brightness)
+
+    if device_type == "openhasp":
+        from tools.openhasp.telnet import OpenHASPTelnet
+
+        # Map 0-100 to 0-255
+        raw_brightness = int(brightness * 255 / 100)
+        tn = OpenHASPTelnet(ip_address)
+        if tn.connect():
+            tn.idle_off()
+            tn.backlight_set(raw_brightness)
+            tn.disconnect()
+            return _success_response(
+                {
+                    "device_type": "openhasp",
+                    "resolved_from": identifier,
+                    "ip": ip_address,
+                    "channel": channel,
+                    "brightness": brightness,
+                    "raw_brightness": raw_brightness,
+                    "note": "Backlight brightness set via Telnet",
+                }
+            )
+        return _error_response_extended(
+            code="DEVICE_UNREACHABLE",
+            message="Telnet connection failed",
+        )
+
     return _error_response_extended(
         code="UNSUPPORTED_TYPE",
         message=f"Unsupported device type: {device_type}",
@@ -216,6 +289,11 @@ def _restart_device(identifier: str, timeout_seconds: int = 10) -> str:
         JSON string with result.
     """
     from tools.iot_discovery import _detect_device_type
+
+    try:
+        identifier = validate_required_string(identifier, "identifier")
+    except ValidationError as exc:
+        return _error_response_extended(code="INVALID_PARAM", message=str(exc))
 
     ip_address = _resolve_or_fail(identifier)
     if not ip_address:
@@ -247,6 +325,32 @@ def _restart_device(identifier: str, timeout_seconds: int = 10) -> str:
                 }
             )
 
+    elif device_type == "tuya":
+        return _error_response_extended(
+            code="UNSUPPORTED_OPERATION",
+            message="Tuya devices do not support a universal restart command",
+            suggestion="Use iot_tuya_set_dp to control individual DPS values.",
+        )
+
+    elif device_type == "openhasp":
+        from tools.openhasp.telnet import OpenHASPTelnet
+
+        tn = OpenHASPTelnet(ip_address)
+        if tn.connect():
+            tn.restart()
+            return _success_response(
+                {
+                    "device_type": "openhasp",
+                    "resolved_from": identifier,
+                    "ip": ip_address,
+                    "message": "Restart command sent via Telnet",
+                }
+            )
+        return _error_response_extended(
+            code="DEVICE_UNREACHABLE",
+            message="Telnet connection failed",
+        )
+
     return _error_response_extended(code="DEVICE_NOT_FOUND", message="Device not found")
 
 
@@ -262,6 +366,11 @@ def _get_wifi_config(identifier: str, timeout_seconds: int = 10) -> str:
     """
     from tools.iot_devices import _get_openbk_status
     from tools.iot_discovery import _detect_device_type
+
+    try:
+        identifier = validate_required_string(identifier, "identifier")
+    except ValidationError as exc:
+        return _error_response_extended(code="INVALID_PARAM", message=str(exc))
 
     ip_address = _resolve_or_fail(identifier)
     if not ip_address:
@@ -304,6 +413,37 @@ def _get_wifi_config(identifier: str, timeout_seconds: int = 10) -> str:
                     "mac": info.get("mac"),
                 },
             }
+        )
+
+    elif device_type == "tuya":
+        return _error_response_extended(
+            code="NOT_AVAILABLE",
+            message="Tuya devices do not expose WiFi configuration via local API",
+            suggestion="Check WiFi info via Tuya cloud or use the Tuya/Smart Life app.",
+        )
+
+    elif device_type == "openhasp":
+        from tools.openhasp.http_client import OpenHASPHTTPClient
+
+        client = OpenHASPHTTPClient(ip_address, timeout=5)
+        config = client.get_json("/config.json")
+        if config:
+            wifi = config.get("wifi", {})
+            return _success_response(
+                {
+                    "device_type": "openhasp",
+                    "resolved_from": identifier,
+                    "ip": ip_address,
+                    "wifi": {
+                        "ssid": wifi.get("ssid", ""),
+                        "rssi": None,
+                        "mac": None,
+                    },
+                }
+            )
+        return _error_response_extended(
+            code="DEVICE_UNREACHABLE",
+            message="Failed to fetch config from OpenHASP panel",
         )
 
     return _error_response_extended(code="DEVICE_NOT_FOUND", message="Device not found")

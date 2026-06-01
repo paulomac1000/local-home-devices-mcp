@@ -1,1 +1,1 @@
-"""Integration tests for Tasmota-OpenBK-MCP."""
+"""Integration tests for local-home-devices-mcp."""

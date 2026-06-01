@@ -6,6 +6,7 @@ Get status and information from OpenBK and Tasmota devices.
 Supports lookup by IP address or device name from the discovery cache.
 """
 
+import json
 import re
 from typing import Any
 
@@ -17,6 +18,11 @@ from tools.constants import (
     increment_tool_count,
     inject_tool_risk_prefix,
     start_tool_context,
+)
+from tools.validators import (
+    ValidationError,
+    validate_channel,
+    validate_required_string,
 )
 
 __all__ = [
@@ -164,6 +170,11 @@ def _get_device_info(identifier: str, timeout_seconds: int = 10) -> str:
         _resolve_ip,
     )
 
+    try:
+        identifier = validate_required_string(identifier, "identifier")
+    except ValidationError as exc:
+        return _error_response_extended(code="INVALID_PARAM", message=str(exc))
+
     ip_address = _resolve_ip(identifier)
 
     if not ip_address:
@@ -187,6 +198,51 @@ def _get_device_info(identifier: str, timeout_seconds: int = 10) -> str:
         info = _get_openbk_status(ip_address, timeout_seconds)
     elif device_type == "tasmota":
         info = _get_tasmota_status(ip_address, timeout_seconds)
+    elif device_type == "tuya":
+        try:
+            from tools.iot_tuya import _tuya_status
+
+            result = _tuya_status(identifier)
+            parsed = json.loads(result)
+            if parsed.get("success"):
+                data = parsed["data"]
+                info = {
+                    "name": data.get("name", "Tuya_Device"),
+                    "device_id": data.get("device_id"),
+                    "ip": ip_address,
+                    "transport": data.get("transport"),
+                    "dps": data.get("dps", {}),
+                    "dps_spec": data.get("dps_spec", {}),
+                }
+            else:
+                info = {"error": parsed.get("error", "Tuya status failed")}  # noqa: F841
+        except Exception as exc:
+            return _error_response_extended(
+                code="INTERNAL_ERROR",
+                message=f"Tuya status query failed: {exc}",
+            )
+    elif device_type == "openhasp":
+        try:
+            from tools.iot_openhasp import _openhasp_status
+
+            result = _openhasp_status(ip_address)
+            parsed = json.loads(result)
+            if parsed.get("success"):
+                data = parsed["data"]
+                info = {
+                    "name": data.get("name", "OpenHASP"),
+                    "ip": ip_address,
+                    "version": data.get("version", "unknown"),
+                    "tft_driver": data.get("tft_driver", "unknown"),
+                    "objects_count": data.get("objects_count", 0),
+                    "bckl": data.get("bckl", 0),
+                    "rssi": data.get("rssi", 0),
+                    "mac": data.get("mac", ""),
+                }
+            else:
+                info = {"error": parsed.get("error", "OpenHASP status failed")}  # noqa: F841
+        except Exception as exc:
+            info = {"error": str(exc)}
     else:
         return _error_response_extended(
             code="UNSUPPORTED_TYPE",
@@ -222,6 +278,12 @@ def _get_device_power(identifier: str, channel: int = 1, timeout_seconds: int = 
         _resolve_ip,
     )
 
+    try:
+        identifier = validate_required_string(identifier, "identifier")
+        channel = validate_channel(channel)
+    except ValidationError as exc:
+        return _error_response_extended(code="INVALID_PARAM", message=str(exc))
+
     ip_address = _resolve_ip(identifier)
 
     if not ip_address:
@@ -235,7 +297,10 @@ def _get_device_power(identifier: str, channel: int = 1, timeout_seconds: int = 
 
     if device_type == "tasmota":
         try:
-            resp = requests.get(f"http://{ip_address}/cm?cmnd=Power", timeout=timeout_seconds)
+            resp = requests.get(
+                f"http://{ip_address}/cm?cmnd=Power",
+                timeout=timeout_seconds,
+            )
             if resp.status_code == 200:
                 data = resp.json()
                 power_key = f"POWER{channel}"
@@ -262,13 +327,67 @@ def _get_device_power(identifier: str, channel: int = 1, timeout_seconds: int = 
                 "resolved_from": identifier,
                 "ip": ip_address,
                 "channel": channel,
-                "state": ("ON" if channel_info and channel_info["value"] > 0 else "OFF"),
+                "state": "ON" if channel_info and channel_info["value"] > 0 else "OFF",
                 "value": channel_info["value"] if channel_info else 0,
             }
         )
 
+    elif device_type == "tuya":
+        try:
+            from tools.iot_tuya import _tuya_status
+
+            result = _tuya_status(identifier)
+            parsed = json.loads(result)
+            if parsed.get("success"):
+                dps = parsed.get("data", {}).get("dps", {})
+                power_dp = dps.get("1")
+                if isinstance(power_dp, bool):
+                    state = "ON" if power_dp else "OFF"
+                elif isinstance(power_dp, str):
+                    state = "ON" if power_dp.lower() in ("on", "true") else "OFF"
+                else:
+                    state = "ON" if power_dp else "OFF"
+                return _success_response(
+                    {
+                        "device_type": "tuya",
+                        "resolved_from": identifier,
+                        "ip": ip_address,
+                        "channel": channel,
+                        "state": state,
+                    }
+                )
+            return result
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    elif device_type == "openhasp":
+        try:
+            from tools.openhasp.telnet import OpenHASPTelnet
+
+            tn = OpenHASPTelnet(ip_address)
+            if tn.connect():
+                bl = tn.backlight_query()
+                tn.disconnect()
+                if isinstance(bl, dict):
+                    state = "ON" if bl.get("state") == "on" else "OFF"
+                    return _success_response(
+                        {
+                            "device_type": "openhasp",
+                            "resolved_from": identifier,
+                            "ip": ip_address,
+                            "channel": channel,
+                            "state": state,
+                        }
+                    )
+            return _error_response_extended(
+                code="DEVICE_UNREACHABLE",
+                message="Telnet connection failed",
+            )
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
     return _error_response_extended(
-        code="UNSUPPORTED_TYPE",
+        code="DEVICE_NOT_FOUND",
         message="Device not found or unsupported",
     )
 
@@ -284,7 +403,7 @@ def register_iot_device_tools(mcp: Any) -> None:
         Accepts either an IP address or a device name from the discovery cache.
 
         Args:
-            identifier: IP address (e.g. "192.168.0.241") or device name.
+            identifier: IP address (e.g. "192.168.1.100") or device name.
             timeout_seconds: Request timeout in seconds (default 10).
 
         Returns:

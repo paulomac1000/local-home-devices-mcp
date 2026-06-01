@@ -1,0 +1,334 @@
+# mypy: disable-error-code="untyped-decorator"
+"""
+Hikvision Doorbell Tools
+
+Debugging and control tools for Hikvision DS-KV6113-WPE1(C) video doorbell.
+Integrates Docker CLI, ISAPI HTTP API, and MQTT health monitoring.
+"""
+
+import base64
+from typing import Any
+
+from tools.constants import (
+    _error_response_extended,
+    _success_response,
+    check_write_enabled,
+    increment_tool_count,
+    inject_tool_risk_prefix,
+    start_tool_context,
+)
+from tools.hikvision.docker_client import (
+    count_vmd_events,
+    get_container_logs,
+    get_container_status,
+    restart_container,
+)
+from tools.hikvision.isapi_client import create_isapi_client
+from tools.validators import ValidationError
+
+__all__ = [
+    "register_hikvision_tools",
+    "_hikvision_container_status",
+    "_hikvision_container_logs",
+    "_hikvision_check_vmd",
+    "_hikvision_restart_container",
+    "_hikvision_take_snapshot",
+    "_hikvision_open_gate",
+    "_hikvision_device_info",
+]
+
+
+def _hikvision_container_status() -> str:
+    """Get hikvision-doorbell Docker container running status and health."""
+    status = get_container_status()
+    return _success_response(status)
+
+
+def _hikvision_container_logs(since: str = "1h", tail: int = 100) -> str:
+    """Fetch logs from the hikvision-doorbell container."""
+    logs = get_container_logs(since=since, tail=tail)
+    return _success_response(
+        {
+            "since": since,
+            "tail": tail,
+            "log_size_chars": len(logs),
+            "logs": logs,
+        }
+    )
+
+
+def _hikvision_check_vmd(since: str = "4h") -> str:
+    """Check if VMD events are flowing from the doorbell."""
+    result = count_vmd_events(since=since)
+    return _success_response(result)
+
+
+def _hikvision_restart_container() -> str:
+    """Restart the hikvision-doorbell Docker container."""
+    result = restart_container()
+    if result["success"]:
+        return _success_response(result)
+    return _error_response_extended(
+        code="DOCKER_ERROR",
+        message=result["message"],
+    )
+
+
+def _hikvision_take_snapshot() -> str:
+    """Capture a JPEG snapshot from the doorbell camera via ISAPI HTTP."""
+    try:
+        client = create_isapi_client()
+        img = client.get_snapshot(channel=1)
+        if img:
+            b64 = base64.b64encode(img).decode("ascii")
+            return _success_response(
+                {
+                    "format": "jpeg",
+                    "size_bytes": len(img),
+                    "base64": b64,
+                }
+            )
+        return _error_response_extended(
+            code="ISAPI_ERROR",
+            message="Failed to capture snapshot. Check ISAPI auth and camera.",
+        )
+    except ValueError as exc:
+        return _error_response_extended(
+            code="MISSING_CREDENTIALS",
+            message=str(exc),
+            suggestion="Set HIKVISION_DOORBELL_USER and HIKVISION_DOORBELL_PASSWORD",
+        )
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
+def _hikvision_open_gate(door_id: int = 1) -> str:
+    """Trigger the electric lock relay to open the gate."""
+    try:
+        client = create_isapi_client()
+        success = client.open_door(door_id=door_id)
+        if success:
+            return _success_response({"opened": True, "door_id": door_id})
+        return _error_response_extended(
+            code="ISAPI_ERROR",
+            message=f"Failed to open door {door_id}",
+        )
+    except ValueError as exc:
+        return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
+def _hikvision_device_info() -> str:
+    """Fetch Hikvision doorbell device information via ISAPI."""
+    try:
+        client = create_isapi_client()
+        info = client.get_device_info()
+        if info:
+            return _success_response(info)
+        return _error_response_extended(
+            code="ISAPI_ERROR",
+            message="Failed to fetch device info. Check credentials and connectivity.",
+        )
+    except ValueError as exc:
+        return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
+def register_hikvision_tools(mcp: Any) -> None:
+    """Register Hikvision doorbell tools with the MCP server."""
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_container_status() -> str:
+        """Get hikvision-doorbell Docker container running status and health.
+
+        Returns container state (running/stopped/error), health check status,
+        and start time. First step in any doorbell debugging session.
+
+        Returns:
+            JSON with running (bool), status (str), started_at (str), health (str).
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_container_status")
+            return _hikvision_container_status()
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_container_logs(since: str = "1h", tail: int = 100) -> str:
+        """Fetch recent logs from the hikvision-doorbell Docker container.
+
+        Key log patterns to look for:
+        - "Motion detected from Gate" - VMD (Video Motion Detection) events
+        - "Doorbell ringing" - someone pressed the call button
+        - "Connected to doorbell: Gate type: VillaVTO" - ISAPI auth successful
+        - "Call dismissed" - ring ended
+        - "Door X unlocked" - gate relay triggered
+        - "tampering_alarm" - physical tamper detected
+
+        Args:
+            since: Time window for logs (e.g. "1h", "4h", "24h"). Default "1h".
+            tail: Maximum number of lines to return (default 100).
+
+        Returns:
+            JSON with since, tail, log_size_chars, and logs text.
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_container_logs")
+            return _hikvision_container_logs(since, tail)
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_check_vmd(since: str = "4h") -> str:
+        """Check if VMD (Video Motion Detection) events are flowing from the doorbell.
+
+        The Hikvision doorbell built-in VMD generates "Motion detected from Gate"
+        events on ANY motion including shadows, lighting changes, car headlights.
+        These false positives are NORMAL and expected. They are the canary for ISAPI
+        health: zero events for 4+ hours means the ISAPI connection from the
+        hikvision-doorbell container to the physical doorbell is silently dead.
+
+        The container will still show "running" - use hikvision_container_status()
+        first to confirm, then this tool to diagnose the ISAPI layer.
+
+        Args:
+            since: Time window to check (default "4h"). Use "8h" overnight.
+
+        Returns:
+            JSON with vmd_count (int), isapi_healthy (bool), check_window (str).
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_check_vmd")
+            return _hikvision_check_vmd(since)
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_restart_container() -> str:
+        """Restart the hikvision-doorbell Docker container.
+
+        WARNING: Write operation - drops the ISAPI connection to the doorbell
+        and re-authenticates. The doorbell is unmonitored for ~10-15 seconds
+        during restart. Use only when hikvision_check_vmd() confirms ISAPI is
+        dead (isapi_healthy=false for 4+ hours).
+
+        After restart, verify recovery with:
+        1. hikvision_container_logs(since="30s") - look for "Connected to doorbell"
+        2. hikvision_check_vmd(since="30s") - VMD should resume within seconds
+
+        Returns:
+            JSON with success (bool) and message (str).
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            check_write_enabled()
+            increment_tool_count("hikvision_restart_container")
+            return _hikvision_restart_container()
+        except ValidationError as exc:
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_take_snapshot() -> str:
+        """Capture a JPEG snapshot from the doorbell camera via ISAPI HTTP.
+
+        Uses HTTP Digest Auth (HIKVISION_DOORBELL_USER/PASSWORD from .env).
+        Returns base64-encoded JPEG - the AI agent can display this directly
+        to see what the doorbell camera is currently viewing.
+
+        Use for: verifying camera works, checking who is at the gate,
+        debugging motion detection (is the view obstructed? is it dark?),
+        post-restart verification that the camera stream is alive.
+
+        Returns:
+            JSON with format ("jpeg"), size_bytes (int), and base64 (str).
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_take_snapshot")
+            return _hikvision_take_snapshot()
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_open_gate(door_id: int = 1) -> str:
+        """Trigger the electric lock relay to open the gate.
+
+        WARNING: Write operation - physically opens the gate! Sends XML command
+        to ISAPI AccessControl/RemoteControl endpoint with digest auth. The relay
+        pulses for the duration configured in the doorbell (typically 5 seconds).
+
+        Verify success with: hikvision_container_logs(since="30s") and look for
+        "Door X unlocked" entries.
+
+        Args:
+            door_id: Door output number (1 = main gate relay). Default 1.
+
+        Returns:
+            JSON with opened (bool) and door_id (int).
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            check_write_enabled()
+            increment_tool_count("hikvision_open_gate")
+            return _hikvision_open_gate(door_id)
+        except ValidationError as exc:
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_device_info() -> str:
+        """Fetch Hikvision doorbell device metadata via ISAPI.
+
+        Returns model, firmware version, serial number, MAC address, and other
+        metadata from the doorbell /ISAPI/System/deviceInfo endpoint.
+
+        Use for: verifying doorbell identity, checking firmware compatibility
+        (ONVIF requires V2.2.65+), troubleshooting ISAPI auth issues.
+
+        Returns:
+            JSON with deviceInfo fields (deviceName, model, firmwareVersion,
+            serialNumber, macAddress, etc.).
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_device_info")
+            return _hikvision_device_info()
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))

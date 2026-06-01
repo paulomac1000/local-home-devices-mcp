@@ -38,10 +38,11 @@ jobs:
             p/auto
             p/secrets
             p/owasp-top-ten
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN || '' }}
 
       - name: Upload SARIF to GitHub Security
         id: upload-sarif
-        if: always()
+        if: always() && hashFiles('semgrep.sarif') != ''
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@v4
         with:
@@ -50,7 +51,7 @@ jobs:
 
       - name: Warn if SARIF upload failed
         if: always() && steps.upload-sarif.outcome == 'failure'
-        run: echo "::warning::SARIF upload failed — check codeql-action reference or permissions"
+        run: echo "::warning::SARIF upload failed - check codeql-action reference or permissions"
 
       - name: Post or update PR comment
         if: always() && github.event_name == 'pull_request'
@@ -65,8 +66,8 @@ jobs:
             const prNumber = context.issue.number;
 
             const body = exitCode === 'success'
-              ? `${marker}\n## ✅ Semgrep Security Scan — Passed\n\nNo security issues or dangerous patterns found.\n\n*Ran: p/auto + p/secrets + p/owasp-top-ten*`
-              : `${marker}\n## ❌ Semgrep Security Scan — Failed\n\n**Semgrep found security issues or dangerous patterns.**\n\nSee the **Security** tab or PR diff for annotations.\n\n*Ran: p/auto + p/secrets + p/owasp-top-ten*\n\n**This is a blocking check — fix before merging.**`;
+              ? `${marker}\n## [PASS] Semgrep Security Scan - Passed\n\nNo security issues or dangerous patterns found.\n\n*Ran: p/auto + p/secrets + p/owasp-top-ten*`
+              : `${marker}\n## [FAIL] Semgrep Security Scan - Failed\n\n**Semgrep found security issues or dangerous patterns.**\n\nSee the **Security** tab or PR diff for annotations.\n\n*Ran: p/auto + p/secrets + p/owasp-top-ten*\n\n**This is a blocking check - fix before merging.**`;
 
             const comments = await github.rest.issues.listComments({
               owner: context.repo.owner,

@@ -2,6 +2,36 @@
 
 All notable changes to this project.
 
+## [1.4.0] — 2026-06-01
+
+### Added
+- **Tuya device support** (10 tools) — cloud API listing, local key retrieval, DPS read/write with local+cloud fallback, protocol version auto-detection, DPS verification against known specs, TCP port scanning, real-time DPS monitoring for diagnostics
+- **OpenHASP panel support** (20 tools) — panel detection, full status (HTTP + Telnet), backlight diagnostics with recommendations, config/page download, file upload, OTA firmware update, Telnet control (raw TCP socket, NOT telnetlib), backlight set with idle override, runtime config via `config/gui`, health scoring (0-100), hardware diagnostic sequence
+- **Hikvision DS-KV6113-WPE1(C) video doorbell support** (7 tools) — Docker container status and logs via Unix socket API, VMD event counting (ISAPI health canary), container restart, JPEG snapshot via ISAPI HTTP Digest Auth, electric gate control via XML RemoteControl, device metadata (model, firmware, serial)
+- **Project renamed** from `tasmota-openbk-mcp` → `local-home-devices-mcp`
+- **iot_tuya_monitor** — real-time DPS change monitoring for Tuya device diagnostics
+- `describe_iot_capabilities` returns manifests for all 51 tools
+
+### Changed
+- `_detect_device_type()` extended with Tuya TCP probe (port 6668) and OpenHASP config.json probe
+- `_probe_device_info()` auto-identifies Tuya devices by trying cached local keys
+- `iot_get_device_info`, `iot_get_device_power`, `iot_set_power`, `iot_set_brightness`, `iot_restart_device`, `iot_get_wifi_config` dispatch to OpenHASP, Tuya, and Hikvision branches
+- `iot_tuya_scan_ports` now scans full network range for Tuya devices
+- Health endpoints expose `tool_count` alongside `tools`/`total`
+
+### Fixed
+- Server version bumped from 1.3.0 → 1.4.0
+- Docker build installs `tinytuya` via optional `[tuya]` extras
+- Tuya cloud API uses `dev.get("key")` not `dev.get("local_key")`
+- Docker client uses Unix socket HTTP API (no Docker CLI dependency)
+- All 51 tools have risk manifests and pass consistency matrix
+- `tool_count` added to all health endpoints per MCP standard
+
+### Documentation
+- README, AGENTS.md, docs/README.md updated with Tuya, OpenHASP, and Hikvision sections
+- `.env.example` updated with all new environment variables
+- Tool counts updated across CI config (51 tools)
+
 ## [1.3.0] — 2026-05-17
 
 ### Added

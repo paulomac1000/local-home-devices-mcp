@@ -1,6 +1,6 @@
-# Tasmota-OpenBK-MCP
+# Local Home Devices MCP
 # Model Context Protocol server for IoT device management
-# Supports OpenBK (OpenBeken) and Tasmota devices
+# Supports OpenBK (OpenBeken), Tasmota, and Tuya devices
 
 FROM python:3.11-slim
 
@@ -15,7 +15,7 @@ RUN groupadd -r appuser && useradd -r -g appuser -m -d /app appuser
 WORKDIR /app
 
 COPY pyproject.toml .
-RUN pip install --no-cache-dir -e ".[mqtt]"
+RUN pip install --no-cache-dir -e ".[mqtt,tuya]"
 
 COPY server.py .
 COPY tools/ ./tools/

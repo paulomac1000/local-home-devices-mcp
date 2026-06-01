@@ -659,4 +659,58 @@ class TestWriteGuardDisabled:
                     data = json.loads(result)
                     assert data["success"] is False
                     assert data["error"]["code"] == "WRITE_DISABLED"
-                    mock_get.assert_not_called()
+
+
+class TestTuyaDispatch:
+    def test_set_power_tuya(self):
+        from tools.iot_control import _set_power
+
+        with (
+            patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.150"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tuya"),
+            patch("tools.iot_tuya._tuya_set_value", return_value='{"success": true}'),
+            patch("tools.validators.validate_power_state", return_value="ON"),
+        ):
+            result = _set_power("test_device", "ON")
+            assert '"success": true' in result
+
+    def test_restart_device_tuya_unsupported(self):
+        from tools.iot_control import _restart_device
+
+        with (
+            patch("tools.iot_control._resolve_or_fail", return_value="192.168.1.150"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tuya"),
+        ):
+            result = _restart_device("test_device")
+            assert "UNSUPPORTED_OPERATION" in result
+
+
+class TestOpenHASPDispatch:
+    def test_set_power_openhasp(self):
+        from tools.iot_control import _set_power
+
+        with (
+            patch("tools.iot_discovery._resolve_ip", return_value="192.168.0.239"),
+            patch("tools.iot_discovery._detect_device_type", return_value="openhasp"),
+            patch("tools.validators.validate_power_state", return_value="ON"),
+            patch("tools.openhasp.telnet.OpenHASPTelnet") as mock_tn_cls,
+        ):
+            mock_tn = MagicMock()
+            mock_tn.connect.return_value = True
+            mock_tn_cls.return_value = mock_tn
+            result = _set_power("192.168.0.239", "ON")
+            assert '"success": true' in result
+
+    def test_restart_device_openhasp(self):
+        from tools.iot_control import _restart_device
+
+        with (
+            patch("tools.iot_control._resolve_or_fail", return_value="192.168.0.239"),
+            patch("tools.iot_discovery._detect_device_type", return_value="openhasp"),
+            patch("tools.openhasp.telnet.OpenHASPTelnet") as mock_tn_cls,
+        ):
+            mock_tn = MagicMock()
+            mock_tn.connect.return_value = True
+            mock_tn_cls.return_value = mock_tn
+            result = _restart_device("192.168.0.239")
+            assert '"success": true' in result

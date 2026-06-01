@@ -1,4 +1,4 @@
-"""E2E test conftest — full pipeline, skip if no server running."""
+"""E2E test conftest - full pipeline, skip if no server running."""
 
 import os
 import socket
