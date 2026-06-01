@@ -1,11 +1,12 @@
 """Integration tests - Hikvision doorbell (Docker socket + ISAPI)."""
 
 import json
+import os
 import socket
 
 import pytest
 
-PANEL_IP = "192.168.1.101"
+PANEL_IP = "192.168.0.138"
 
 
 def _doorbell_reachable():
@@ -17,20 +18,15 @@ def _doorbell_reachable():
         return False
 
 
-def _docker_available():
-    try:
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(1)
-        s.connect("/var/run/docker.sock")
-        s.close()
-        return True
-    except (OSError, FileNotFoundError):
-        return False
+def _hikvision_configured():
+    return bool(os.getenv("HIKVISION_DOORBELL_HOST")) and bool(
+        os.getenv("HIKVISION_DOORBELL_USER")
+    )
 
 
 pytestmark = pytest.mark.skipif(
-    not (_doorbell_reachable() or _docker_available()),
-    reason="Hikvision doorbell or Docker socket not accessible",
+    not (_hikvision_configured() and _doorbell_reachable()),
+    reason="Hikvision doorbell not reachable or credentials not configured",
 )
 
 
