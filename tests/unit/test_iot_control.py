@@ -668,8 +668,7 @@ class TestTuyaDispatch:
         with (
             patch("tools.iot_discovery._resolve_ip", return_value="192.168.1.150"),
             patch("tools.iot_discovery._detect_device_type", return_value="tuya"),
-            patch("tools.iot_tuya._tuya_set_value",
-                  return_value='{"success": true}'),
+            patch("tools.iot_tuya._tuya_set_value", return_value='{"success": true}'),
             patch("tools.validators.validate_power_state", return_value="ON"),
         ):
             result = _set_power("test_device", "ON")
