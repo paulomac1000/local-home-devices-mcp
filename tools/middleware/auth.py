@@ -82,8 +82,6 @@ class AuthMiddleware:
         auth_header = headers.get("authorization", "") or headers.get("Authorization", "")
         bearer_token = auth_header[7:] if auth_header.startswith("Bearer ") else None
         api_key = headers.get("x-api-key", "") or headers.get("X-Api-Key", "")
-        if not api_key:
-            api_key = None
 
         # Track what is needed/was attempted for error reporting
         bearer_expected = bool(self._allowed_token)

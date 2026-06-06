@@ -13,7 +13,7 @@ which is self-contained via Starlette.
 """
 
 import sys
-from unittest.mock import MagicMock, PropertyMock, patch
+from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
 # Mock the broken fastmcp package BEFORE any import from 'server'.
@@ -27,7 +27,9 @@ _FastMCP_cls = MagicMock()
 _fastmcp_mock.FastMCP = _FastMCP_cls
 sys.modules["fastmcp"] = _fastmcp_mock
 
-from server import (
+import pytest  # noqa: E402
+
+from server import (  # noqa: E402
     BIND_HOST,
     _create_session,
     _delete_session,
@@ -35,11 +37,8 @@ from server import (
     _validate_session,
     create_rest_app,
 )
-
-from tools.middleware.auth import AuthMiddleware
-from tools.middleware.rate_limit import RateLimitExceeded, RateLimitMiddleware
-
-import pytest
+from tools.middleware.auth import AuthMiddleware  # noqa: E402
+from tools.middleware.rate_limit import RateLimitExceeded, RateLimitMiddleware  # noqa: E402
 
 pytestmark = pytest.mark.unit
 

@@ -10,9 +10,8 @@ from unittest.mock import patch
 import pytest
 
 from tools.middleware.auth import AuthMiddleware
-from tools.middleware.rate_limit import RateLimitExceeded, RateLimitMiddleware
 from tools.middleware.logging_mw import LoggingMiddleware
-
+from tools.middleware.rate_limit import RateLimitExceeded, RateLimitMiddleware
 
 # =============================================================================
 # AuthMiddleware
