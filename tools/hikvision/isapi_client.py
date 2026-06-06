@@ -10,9 +10,10 @@ All response parsing uses defusedxml ElementTree helpers.
 
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from typing import Any
 
 import requests
-from defusedxml import ElementTree as SafeET  # type: ignore[import-untyped]
+from defusedxml import ElementTree as SafeET
 from requests.auth import HTTPDigestAuth
 
 from tools.constants import (
@@ -88,7 +89,7 @@ class HikvisionISAPIClient:
         except Exception:
             return None
 
-    def get_alarm_server(self) -> dict | None:
+    def get_alarm_server(self) -> dict[str, str | int | None] | None:
         """Fetch the first HTTP host notification (alarm server) configuration.
 
         Endpoint: GET /ISAPI/Event/notification/httpHosts
@@ -118,7 +119,7 @@ class HikvisionISAPIClient:
         except Exception:
             return None
 
-    def save_snapshot(self, filepath: str) -> dict:
+    def save_snapshot(self, filepath: str) -> dict[str, str | int | bool]:
         """Capture a snapshot and save it to disk.
 
         Reuses get_snapshot() to capture the JPEG image, then writes
@@ -145,7 +146,7 @@ class HikvisionISAPIClient:
         except Exception as exc:
             return {"saved": False, "error": str(exc)}
 
-    def get_event_triggers(self) -> list[dict] | None:
+    def get_event_triggers(self) -> list[dict[str, Any]] | None:
         """Fetch event trigger configuration from ISAPI.
 
         Endpoint: GET /ISAPI/Event/triggers
@@ -166,7 +167,7 @@ class HikvisionISAPIClient:
             for trigger_elem in root.findall(f".//{{{ISAPI_NS}}}EventTrigger"):
                 trigger_id = trigger_elem.find(f"{{{ISAPI_NS}}}id")
                 event_type = trigger_elem.find(f"{{{ISAPI_NS}}}eventType")
-                trigger: dict = {
+                trigger: dict[str, Any] = {
                     "id": (
                         trigger_id.text.strip()
                         if trigger_id is not None and trigger_id.text
@@ -185,7 +186,7 @@ class HikvisionISAPIClient:
                         notif_id = notif_elem.find(f"{{{ISAPI_NS}}}id")
                         method = notif_elem.find(f"{{{ISAPI_NS}}}notificationMethod")
                         recurrence = notif_elem.find(f"{{{ISAPI_NS}}}recurrence")
-                        notification: dict = {
+                        notification: dict[str, Any] = {
                             "id": (
                                 notif_id.text.strip()
                                 if notif_id is not None and notif_id.text
@@ -206,7 +207,7 @@ class HikvisionISAPIClient:
         except Exception:
             return None
 
-    def get_motion_config(self) -> dict | None:
+    def get_motion_config(self) -> dict[str, Any] | None:
         """Fetch motion detection configuration from ISAPI.
 
         Endpoint: GET /ISAPI/System/Video/inputs/channels/1/MotionDetection

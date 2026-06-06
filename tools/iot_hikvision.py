@@ -237,7 +237,7 @@ def _hikvision_snapshot_to_file(filepath: str) -> str:
             return _success_response(result)
         return _error_response_extended(
             code="ISAPI_ERROR",
-            message=result.get("error", "Failed to save snapshot"),
+            message=str(result.get("error", "Failed to save snapshot")),
         )
     except ValidationError as exc:
         return _error_response_extended(code="VALIDATION_ERROR", message=str(exc))
