@@ -1,0 +1,63 @@
+{
+  "schema_version": 2,
+  "active_work_id": "hikvision-diagnostic-tools-5080361d",
+  "works": {
+    "hikvision-diagnostic-tools-5080361d": {
+      "work_id": "hikvision-diagnostic-tools-5080361d",
+      "active_plan": "/home/pablo/tasmota-openbk-mcp/.omo/plans/hikvision-diagnostic-tools.md",
+      "plan_name": "hikvision-diagnostic-tools",
+      "status": "active",
+      "started_at": "2026-06-06T13:47:17.710Z",
+      "updated_at": "2026-06-06T13:58:18.488Z",
+      "session_ids": [
+        "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
+      ],
+      "session_origins": {
+        "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {
+        "todo:1": {
+          "task_key": "todo:1",
+          "task_label": "1",
+          "task_title": "`tools/constants.py` — Add 7 new tool manifests",
+          "session_id": "opencode:ses_162ce6aa8ffeETZUTwm2iFipwB",
+          "agent": "Sisyphus-Junior",
+          "category": "quick",
+          "updated_at": "2026-06-06T13:58:18.488Z",
+          "started_at": "2026-06-06T13:53:23.535Z",
+          "status": "completed",
+          "ended_at": "2026-06-06T13:58:18.488Z",
+          "elapsed_ms": 294953
+        }
+      }
+    }
+  },
+  "active_plan": "/home/pablo/tasmota-openbk-mcp/.omo/plans/hikvision-diagnostic-tools.md",
+  "started_at": "2026-06-06T13:47:17.710Z",
+  "status": "active",
+  "updated_at": "2026-06-06T13:58:18.488Z",
+  "session_ids": [
+    "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
+  ],
+  "session_origins": {
+    "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV": "direct"
+  },
+  "plan_name": "hikvision-diagnostic-tools",
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "`tools/constants.py` — Add 7 new tool manifests",
+      "session_id": "opencode:ses_162ce6aa8ffeETZUTwm2iFipwB",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-06-06T13:58:18.488Z",
+      "started_at": "2026-06-06T13:53:23.535Z",
+      "status": "completed",
+      "ended_at": "2026-06-06T13:58:18.488Z",
+      "elapsed_ms": 294953
+    }
+  },
+  "agent": "atlas"
+}

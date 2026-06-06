@@ -1,0 +1,15 @@
+task-1-manifests-present.txt - OK: 14 hikvision_* manifests in TOOL_MANIFESTS
+
+7 new entries added after hikvision_device_info (line 770):
+1. hikvision_get_motion_config   - READ
+2. hikvision_set_motion_detection - WRITE
+3. hikvision_get_event_config    - READ
+4. hikvision_get_alarm_server    - READ
+5. hikvision_snapshot_to_file    - READ (side_effects=read)
+6. hikvision_isapi_health        - READ
+7. hikvision_pipeline_diagnose   - READ
+
+Verification:
+- 26/26 unit tests passed
+- lsp_diagnostics: clean
+- Python import verified: 14 total hikvision entries
