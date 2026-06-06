@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from defusedxml import ElementTree as SafeET
+from defusedxml import ElementTree as SafeET  # type: ignore[import-untyped]
 from requests.auth import HTTPDigestAuth
 
 from tools.constants import (
