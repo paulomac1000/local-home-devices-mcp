@@ -1,5 +1,0 @@
-test_save_snapshot_failure: PASSED
-- Created HikvisionISAPIClient with mocked Session
-- Mocked get_snapshot to return None
-- Called save_snapshot(filepath=/tmp/nonexistent/test.jpg)
-- Asserted: saved=False, "error" in result, "Failed to capture" in error

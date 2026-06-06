@@ -1,6 +1,0 @@
-test_save_snapshot_success: PASSED
-- Created HikvisionISAPIClient with mocked Session
-- Mocked get_snapshot to return b"fake_jpeg_bytes"
-- Called save_snapshot(filepath=tmp_path/test.jpg)
-- Asserted: saved=True, size_bytes=15, filepath ends with test.jpg, format=jpeg
-- Verified get_snapshot called with channel=1
