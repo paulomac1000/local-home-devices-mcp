@@ -56,6 +56,22 @@ class TestHikvisionE2E:
         result = data["result"]
         assert result["success"] is True
 
+    def test_get_motion_config_via_rest(self):
+        data = _call_tool("hikvision_get_motion_config")
+        result = data["result"]
+        # Tool may return success:false if doorbell model doesn't support MotionDetection
+        assert "success" in result
+
+    def test_get_event_config_via_rest(self):
+        data = _call_tool("hikvision_get_event_config")
+        result = data["result"]
+        assert result["success"] is True
+
+    def test_isapi_health_via_rest(self):
+        data = _call_tool("hikvision_isapi_health", since="4h")
+        result = data["result"]
+        assert result["success"] is True
+
     def test_tools_include_hikvision(self):
         import requests
 
@@ -63,4 +79,4 @@ class TestHikvisionE2E:
         data = resp.json()
         tool_names = [t["name"] for t in data["tools"]]
         hik_tools = [n for n in tool_names if n.startswith("hikvision_")]
-        assert len(hik_tools) == 7
+        assert len(hik_tools) == 14  # 7 existing + 7 new

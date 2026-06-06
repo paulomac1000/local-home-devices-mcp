@@ -203,3 +203,24 @@ def count_vmd_events(since: str = "4h") -> dict[str, Any]:
         "isapi_healthy": vmd_count > 0,
         "check_window": since,
     }
+
+
+def count_call_events(since: str = "4h") -> dict[str, Any]:
+    """Count call events in container logs.
+
+    Call events appear as: 'Doorbell ringing'
+    Zero events indicates the doorbell button may not be working.
+
+    Args:
+        since: Time window (default "4h").
+
+    Returns:
+        Dict with: call_count (int), has_calls (bool), check_window (str).
+    """
+    logs = get_container_logs(since=since, tail=200)
+    call_count = logs.count("Doorbell ringing")
+    return {
+        "call_count": call_count,
+        "has_calls": call_count > 0,
+        "check_window": since,
+    }

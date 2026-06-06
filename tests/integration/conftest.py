@@ -51,16 +51,30 @@ class MCPWrapper:
 
     def call_tool(self, tool_name, **kwargs):
         """Look up and execute a registered tool by name."""
-        tools = (
-            self._mcp._tool_manager._tools
-            if hasattr(self._mcp, "_tool_manager")
-            else getattr(self._mcp, "_tools", {})
-        )
-        tool = tools.get(tool_name)
+        # FastMCP 3.x: get_tool is async, tool_manager._tools removed
+        if hasattr(self._mcp, "_tool_manager") and hasattr(self._mcp._tool_manager, "_tools"):
+            tools = self._mcp._tool_manager._tools
+            tool = tools.get(tool_name)
+        elif hasattr(self._mcp, "_tools"):
+            tool = self._mcp._tools.get(tool_name)
+        else:
+            # FastMCP 3.x: use async get_tool
+            try:
+                tool = asyncio.run(self._mcp.get_tool(tool_name))
+            except Exception:
+                tool = None
+
         if tool is None:
-            available = list(tools.keys())
+            # Get available tools for error message
+            try:
+                all_tools = asyncio.run(self._mcp.list_tools())
+                available = [t.name for t in all_tools]
+            except Exception:
+                available = []
             raise ValueError(f"Tool '{tool_name}' not found among {available}")
-        fn = getattr(tool, "fn", tool)
+
+        # FastMCP 3.x tool functions may have a different wrapper
+        fn = getattr(tool, "fn", tool) if not isinstance(tool, dict) else tool
         if inspect.iscoroutinefunction(fn):
             return _run_async(fn, **kwargs)
         return fn(**kwargs)

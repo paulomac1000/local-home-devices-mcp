@@ -35,6 +35,10 @@ HIKVISION_DOORBELL_USER = os.getenv("HIKVISION_DOORBELL_USER", "")
 HIKVISION_DOORBELL_PASSWORD = os.getenv("HIKVISION_DOORBELL_PASSWORD", "")
 HIKVISION_CONTAINER_NAME = os.getenv("HIKVISION_CONTAINER_NAME", "hikvision-doorbell")
 DOCKER_SOCKET = os.getenv("DOCKER_SOCKET", "/var/run/docker.sock")
+CAMERA_GATE_SNAPSHOTS_DIR = os.getenv(
+    "CAMERA_GATE_SNAPSHOTS_DIR",
+    "/config/www/archive/camera_gate",
+)
 TUYA_ACCESS_ID = os.getenv("TUYA_ACCESS_ID", "")
 TUYA_ACCESS_SECRET = os.getenv("TUYA_ACCESS_SECRET", "")
 TUYA_PROJECT_CODE = os.getenv("TUYA_PROJECT_CODE", "")
@@ -766,6 +770,52 @@ TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
         timeout_ms=10000,
         latency="fast",
         cost="cheap",
+        privacy="metadata",
+    ),
+    "hikvision_get_motion_config": _make_manifest(
+        "hikvision_get_motion_config",
+        timeout_ms=10000,
+        latency="moderate",
+        cost="moderate",
+        privacy="metadata",
+    ),
+    "hikvision_set_motion_detection": _make_write_manifest(
+        "hikvision_set_motion_detection",
+        timeout_ms=15000,
+        latency="moderate",
+        impact="transient",
+    ),
+    "hikvision_get_event_config": _make_manifest(
+        "hikvision_get_event_config",
+        timeout_ms=10000,
+        latency="moderate",
+        cost="moderate",
+        privacy="metadata",
+    ),
+    "hikvision_get_alarm_server": _make_manifest(
+        "hikvision_get_alarm_server",
+        timeout_ms=10000,
+        latency="fast",
+        cost="cheap",
+        privacy="metadata",
+    ),
+    "hikvision_snapshot_to_file": _make_write_manifest(
+        "hikvision_snapshot_to_file",
+        timeout_ms=15000,
+        impact="persistent",
+    ),
+    "hikvision_isapi_health": _make_manifest(
+        "hikvision_isapi_health",
+        timeout_ms=10000,
+        latency="fast",
+        cost="cheap",
+        privacy="none",
+    ),
+    "hikvision_pipeline_diagnose": _make_manifest(
+        "hikvision_pipeline_diagnose",
+        timeout_ms=15000,
+        latency="slow",
+        cost="expensive",
         privacy="metadata",
     ),
 }

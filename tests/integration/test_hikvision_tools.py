@@ -74,3 +74,29 @@ class TestHikvisionIntegration:
     def test_open_gate_write_guard(self, mcp_client):
         data = _get_result(mcp_client, "hikvision_open_gate")
         assert data["success"] is True
+
+    def test_get_motion_config_returns_config(self, mcp_client):
+        data = _get_result(mcp_client, "hikvision_get_motion_config")
+        assert data["success"] is True
+        assert "enabled" in data["data"]
+        assert "sensitivity" in data["data"]
+
+    def test_get_event_config_returns_triggers(self, mcp_client):
+        data = _get_result(mcp_client, "hikvision_get_event_config")
+        assert data["success"] is True
+        assert "triggers" in data["data"]
+
+    def test_get_alarm_server_returns_config(self, mcp_client):
+        data = _get_result(mcp_client, "hikvision_get_alarm_server")
+        assert data["success"] is True
+
+    def test_isapi_health_returns_status(self, mcp_client):
+        data = _get_result(mcp_client, "hikvision_isapi_health")
+        assert data["success"] is True
+        assert "overall" in data["data"]
+
+    def test_pipeline_diagnose_returns_layers(self, mcp_client):
+        data = _get_result(mcp_client, "hikvision_pipeline_diagnose")
+        assert data["success"] is True
+        assert "layers" in data["data"]
+        assert "issues" in data["data"]

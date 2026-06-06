@@ -1,0 +1,10 @@
+TEST: test_count_call_events_with_calls
+STATUS: PASSED
+INPUT:
+  mocked get_container_logs returns:
+    "Doorbell ringing\nMotion detected from Gate\nDoorbell ringing\nDoorbell ringing"
+  since="4h"
+EXPECTED:
+  call_count == 3
+  has_calls is True
+ACTUAL: PASSED - all assertions met

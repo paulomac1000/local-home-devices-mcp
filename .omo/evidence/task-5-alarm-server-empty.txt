@@ -1,0 +1,2 @@
+test_get_alarm_server_not_configured PASSED
+54/54 tests pass (0 failures)
