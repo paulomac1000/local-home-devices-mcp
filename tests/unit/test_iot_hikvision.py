@@ -22,6 +22,52 @@ FAKE_XML = (
     "</DeviceInfo>"
 )
 
+FAKE_MOTION_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<MotionDetection xmlns="http://www.isapi.org/ver20/XMLSchema">'
+    "<enabled>true</enabled>"
+    "<regionType>grid</regionType>"
+    "<Grid>"
+    "<rowGranularity>18x18</rowGranularity>"
+    "<columnGranularity>22x22</columnGranularity>"
+    "</Grid>"
+    "<MotionDetectionLayout>"
+    "<sensitivityLevel>70</sensitivityLevel>"
+    "<layout>"
+    "<gridMap>0F0F</gridMap>"
+    "</layout>"
+    "</MotionDetectionLayout>"
+    "</MotionDetection>"
+)
+
+FAKE_TRIGGERS_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<EventTriggerList xmlns="http://www.isapi.org/ver20/XMLSchema">'
+    "<EventTrigger>"
+    "<id>vmd-1</id>"
+    "<eventType>VMD</eventType>"
+    "<EventTriggerNotificationList>"
+    "<EventTriggerNotification>"
+    "<id>center</id>"
+    "<notificationMethod>center</notificationMethod>"
+    "<recurrence>beginning</recurrence>"
+    "</EventTriggerNotification>"
+    "</EventTriggerNotificationList>"
+    "</EventTrigger>"
+    "<EventTrigger>"
+    "<id>videoloss-1</id>"
+    "<eventType>videoloss</eventType>"
+    "<EventTriggerNotificationList>"
+    "<EventTriggerNotification>"
+    "<id>center</id>"
+    "<notificationMethod>center</notificationMethod>"
+    "<recurrence>beginning</recurrence>"
+    "</EventTriggerNotification>"
+    "</EventTriggerNotificationList>"
+    "</EventTrigger>"
+    "</EventTriggerList>"
+)
+
 
 def _json(data):
     return _success_response(data)
@@ -86,6 +132,29 @@ class TestHikvisionDockerClient:
             assert result["vmd_count"] == 0
             assert result["isapi_healthy"] is False
 
+    def test_count_call_events_with_calls(self):
+        from tools.hikvision.docker_client import count_call_events
+
+        with patch("tools.hikvision.docker_client.get_container_logs") as mock_logs:
+            mock_logs.return_value = (
+                "Doorbell ringing\n"
+                "Motion detected from Gate\n"
+                "Doorbell ringing\n"
+                "Doorbell ringing"
+            )
+            result = count_call_events(since="4h")
+            assert result["call_count"] == 3
+            assert result["has_calls"] is True
+
+    def test_count_call_events_no_calls(self):
+        from tools.hikvision.docker_client import count_call_events
+
+        with patch("tools.hikvision.docker_client.get_container_logs") as mock_logs:
+            mock_logs.return_value = "Motion detected from Gate"
+            result = count_call_events(since="4h")
+            assert result["call_count"] == 0
+            assert result["has_calls"] is False
+
     def test_restart_container_success(self):
         from tools.hikvision.docker_client import restart_container
 
@@ -112,6 +181,29 @@ class TestHikvisionDockerClient:
 
 
 class TestHikvisionISAPIClient:
+    def test_get_motion_config_success(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            mock_resp = MagicMock(status_code=200, text=FAKE_MOTION_XML)
+            MockSession.return_value.get.return_value = mock_resp
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            config = client.get_motion_config()
+            assert config is not None
+            assert config["enabled"] is True
+            assert config["sensitivity"] == 70
+            assert config["grid_map"] == "0F0F"
+            assert config["grid_rows"] == 18
+            assert config["grid_cols"] == 22
+
+    def test_get_motion_config_failure(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            MockSession.return_value.get.side_effect = __import__("requests").RequestException("Timeout")
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            assert client.get_motion_config() is None
+
     def test_get_device_info_success(self):
         from tools.hikvision.isapi_client import HikvisionISAPIClient
 
@@ -169,6 +261,31 @@ class TestHikvisionISAPIClient:
             MockSession.return_value.put.return_value = mock_resp
             client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
             assert client.open_door() is False
+
+    def test_get_event_triggers_success(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            mock_resp = MagicMock(status_code=200, text=FAKE_TRIGGERS_XML)
+            MockSession.return_value.get.return_value = mock_resp
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            result = client.get_event_triggers()
+            assert result is not None
+            assert len(result) == 2
+            assert result[0]["event_type"] == "VMD"
+            assert result[0]["notifications"][0]["method"] == "center"
+            assert result[1]["event_type"] == "videoloss"
+            assert result[1]["notifications"][0]["recurrence"] == "beginning"
+
+    def test_get_event_triggers_failure(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            mock_resp = MagicMock(status_code=500)
+            mock_resp.raise_for_status.side_effect = Exception("500")
+            MockSession.return_value.get.return_value = mock_resp
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            assert client.get_event_triggers() is None
 
     def test_ping_reachable(self):
         from tools.hikvision.isapi_client import HikvisionISAPIClient
@@ -376,8 +493,53 @@ class TestHikvisionDockerClientDeep:
             assert result["vmd_count"] == 1
 
 
+FAKE_ALARM_SERVER_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<HttpHostNotificationList xmlns="http://www.isapi.org/ver20/XMLSchema">'
+    "<HttpHostNotification>"
+    "<id>1</id>"
+    "<url>/api/hikvision</url>"
+    "<protocolType>HTTP</protocolType>"
+    "<ipAddress>192.168.0.101</ipAddress>"
+    "<portNo>8123</portNo>"
+    "<authentication>none</authentication>"
+    "</HttpHostNotification>"
+    "</HttpHostNotificationList>"
+)
+
+FAKE_ALARM_SERVER_EMPTY_XML = (
+    '<?xml version="1.0" encoding="UTF-8"?>'
+    '<HttpHostNotificationList xmlns="http://www.isapi.org/ver20/XMLSchema"/>'
+)
+
+
 class TestHikvisionISAPIClientDeep:
     """Additional ISAPI client tests for uncovered edge cases."""
+
+    def test_get_alarm_server_success(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            mock_resp = MagicMock(status_code=200, text=FAKE_ALARM_SERVER_XML)
+            MockSession.return_value.get.return_value = mock_resp
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            result = client.get_alarm_server()
+            assert result is not None
+            assert result["url"] == "/api/hikvision"
+            assert result["port"] == 8123
+            assert result["ip"] == "192.168.0.101"
+            assert result["protocol"] == "HTTP"
+            assert result["auth_method"] == "none"
+
+    def test_get_alarm_server_not_configured(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            mock_resp = MagicMock(status_code=200, text=FAKE_ALARM_SERVER_EMPTY_XML)
+            MockSession.return_value.get.return_value = mock_resp
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            result = client.get_alarm_server()
+            assert result is None
 
     def test_ping_reachable(self):
         from tools.hikvision.isapi_client import HikvisionISAPIClient
@@ -427,3 +589,28 @@ class TestHikvisionISAPIClientDeep:
                 assert False, "Should raise ValueError"
             except ValueError as exc:
                 assert "HIKVISION_DOORBELL_USER" in str(exc)
+
+    def test_save_snapshot_success(self, tmp_path):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            client.get_snapshot = MagicMock(return_value=b"fake_jpeg_bytes")
+            filepath = str(tmp_path / "test.jpg")
+            result = client.save_snapshot(filepath=filepath)
+            assert result["saved"] is True
+            assert result["size_bytes"] == 15
+            assert result["filepath"].endswith("test.jpg")
+            assert result["format"] == "jpeg"
+            client.get_snapshot.assert_called_once_with(channel=1)
+
+    def test_save_snapshot_failure(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            client.get_snapshot = MagicMock(return_value=None)
+            result = client.save_snapshot(filepath="/tmp/nonexistent/test.jpg")
+            assert result["saved"] is False
+            assert "error" in result
+            assert "Failed to capture" in result["error"]
