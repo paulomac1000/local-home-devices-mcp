@@ -7,6 +7,8 @@ Integrates Docker CLI, ISAPI HTTP API, and MQTT health monitoring.
 """
 
 import base64
+import os
+from pathlib import Path
 from typing import Any
 
 from tools.constants import (
@@ -18,13 +20,14 @@ from tools.constants import (
     start_tool_context,
 )
 from tools.hikvision.docker_client import (
+    count_call_events,
     count_vmd_events,
     get_container_logs,
     get_container_status,
     restart_container,
 )
 from tools.hikvision.isapi_client import create_isapi_client
-from tools.validators import ValidationError
+from tools.validators import ValidationError, validate_required_string
 
 __all__ = [
     "register_hikvision_tools",
@@ -35,6 +38,13 @@ __all__ = [
     "_hikvision_take_snapshot",
     "_hikvision_open_gate",
     "_hikvision_device_info",
+    "_hikvision_get_motion_config",
+    "_hikvision_set_motion_detection",
+    "_hikvision_get_event_config",
+    "_hikvision_get_alarm_server",
+    "_hikvision_snapshot_to_file",
+    "_hikvision_isapi_health",
+    "_hikvision_pipeline_diagnose",
 ]
 
 
@@ -192,6 +202,9 @@ def register_hikvision_tools(mcp: Any) -> None:
     @inject_tool_risk_prefix
     def hikvision_check_vmd(since: str = "4h") -> str:
         """Check if VMD (Video Motion Detection) events are flowing from the doorbell.
+
+        Deprecated -- use hikvision_isapi_health for comprehensive health check
+        (container + VMD + call events).
 
         The Hikvision doorbell built-in VMD generates "Motion detected from Gate"
         events on ANY motion including shadows, lighting changes, car headlights.
