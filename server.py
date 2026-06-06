@@ -364,7 +364,7 @@ def main() -> None:
 
     # 3. Start MCP SSE server (port 9101) - BLOCKING!
     logger.info("Starting MCP SSE transport on port %s...", MCP_SSE_PORT)
-    mcp.run(transport="sse", host=BIND_HOST, port=MCP_SSE_PORT)  # type: ignore
+    mcp.run(transport="sse", host=BIND_HOST, port=MCP_SSE_PORT)
 
 
 if __name__ == "__main__":
