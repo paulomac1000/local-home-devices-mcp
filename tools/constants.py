@@ -25,6 +25,10 @@ NETWORK_RANGE = os.getenv("NETWORK_RANGE")
 MCP_SSE_PORT = int(os.getenv("MCP_SSE_PORT", "9101"))
 REST_API_PORT = int(os.getenv("REST_API_PORT", "9102"))
 
+# Streamable HTTP transport
+MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "both")  # streamable-http, sse, both
+MCP_ALLOWED_ORIGINS = os.getenv("MCP_ALLOWED_ORIGINS", "http://localhost:*")
+
 HEALTH_CHECK_PORT = int(os.getenv("HEALTH_CHECK_PORT", "9100"))
 OPENHASP_DEFAULT_HOST = os.getenv("OPENHASP_DEFAULT_HOST", "192.168.1.100")
 OPENHASP_HTTP_PORT = int(os.getenv("OPENHASP_HTTP_PORT", "80"))
