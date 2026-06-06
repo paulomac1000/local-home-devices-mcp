@@ -101,7 +101,7 @@ def start_health_server(port: int = 9100) -> HTTPServer:
 # INITIALIZE MCP SERVER
 # =============================================================================
 
-mcp = FastMCP("IoT-Observer")
+mcp = FastMCP("IoT-Observer", host=BIND_HOST, port=MCP_SSE_PORT)
 
 # =============================================================================
 # REGISTER ALL TOOLS
