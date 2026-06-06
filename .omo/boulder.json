@@ -1,1 +1,35 @@
-{"schema_version":2,"works":{},"active_plan":null,"started_at":null,"status":"idle","updated_at":"2026-06-06T16:45:00.000Z","session_ids":[],"session_origins":{},"plan_name":null,"task_sessions":{},"agent":"atlas"}
+{
+  "schema_version": 2,
+  "works": {
+    "deploy-and-verify-671e1c0e": {
+      "work_id": "deploy-and-verify-671e1c0e",
+      "active_plan": "/home/pablo/tasmota-openbk-mcp/.omo/plans/deploy-and-verify.md",
+      "plan_name": "deploy-and-verify",
+      "status": "active",
+      "started_at": "2026-06-06T17:51:46.315Z",
+      "updated_at": "2026-06-06T17:51:46.315Z",
+      "session_ids": [
+        "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
+      ],
+      "session_origins": {
+        "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV": "direct"
+      },
+      "agent": "atlas",
+      "task_sessions": {}
+    }
+  },
+  "active_plan": "/home/pablo/tasmota-openbk-mcp/.omo/plans/deploy-and-verify.md",
+  "started_at": "2026-06-06T17:51:46.315Z",
+  "status": "active",
+  "updated_at": "2026-06-06T17:51:46.315Z",
+  "session_ids": [
+    "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
+  ],
+  "session_origins": {
+    "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV": "direct"
+  },
+  "plan_name": "deploy-and-verify",
+  "task_sessions": {},
+  "agent": "atlas",
+  "active_work_id": "deploy-and-verify-671e1c0e"
+}
