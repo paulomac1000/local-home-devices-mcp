@@ -56,7 +56,9 @@ def _docker_request(method: str, path: str, timeout: int = 10) -> tuple[int, str
         status_line = headers_part.split("\r\n")[0]
         try:
             status_code = int(status_line.split(" ")[1])
-        except (ValueError, IndexError):
+        except ValueError:
+            return None
+        except IndexError:
             return None
 
         # Handle chunked transfer encoding

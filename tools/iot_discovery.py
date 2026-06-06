@@ -74,7 +74,9 @@ def _load_cache() -> dict[str, Any]:
                 if not isinstance(result, dict):
                     return {"devices": [], "last_scan": None, "version": 1}
                 return result
-        except (json.JSONDecodeError, OSError):
+        except json.JSONDecodeError:
+            return {"devices": [], "last_scan": None, "version": 1}
+        except OSError:
             return {"devices": [], "last_scan": None, "version": 1}
 
 
@@ -118,7 +120,9 @@ def _is_cache_fresh() -> bool:
     try:
         scan_time = calendar.timegm(time.strptime(last_scan, "%Y-%m-%dT%H:%M:%SZ"))
         return (time.time() - scan_time) < CACHE_TTL_SECONDS
-    except (ValueError, OverflowError):
+    except ValueError:
+        return False
+    except OverflowError:
         return False
 
 

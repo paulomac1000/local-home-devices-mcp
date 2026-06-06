@@ -7,6 +7,11 @@ name = "local-home-devices-mcp"
 version = "1.5.0"
 description = "MCP server for local home device management: Tasmota, OpenBK, Tuya, OpenHASP, and Hikvision"
 requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.12",
+]
 dependencies = [
     "defusedxml>=0.7.1",
     "fastmcp>=2.0.0,<3.0.0",
@@ -39,7 +44,7 @@ local-home-devices-mcp = "server:main"
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP"]
@@ -49,7 +54,7 @@ strict = true
 python_version = "3.14"
 
 [[tool.mypy.overrides]]
-module = ["tools.iot_tuya"]
+module = ["tools.iot_tuya", "tools.hikvision.isapi_client"]
 disable_error_code = [
     "assignment",
     "dict-item",

@@ -215,7 +215,7 @@ def _get_device_info(identifier: str, timeout_seconds: int = 10) -> str:
                     "dps_spec": data.get("dps_spec", {}),
                 }
             else:
-                info = {"error": parsed.get("error", "Tuya status failed")}  # noqa: F841
+                info = {"error": parsed.get("error", "Tuya status failed")}
         except Exception as exc:
             return _error_response_extended(
                 code="INTERNAL_ERROR",
@@ -240,7 +240,7 @@ def _get_device_info(identifier: str, timeout_seconds: int = 10) -> str:
                     "mac": data.get("mac", ""),
                 }
             else:
-                info = {"error": parsed.get("error", "OpenHASP status failed")}  # noqa: F841
+                info = {"error": parsed.get("error", "OpenHASP status failed")}
         except Exception as exc:
             info = {"error": str(exc)}
     else:
