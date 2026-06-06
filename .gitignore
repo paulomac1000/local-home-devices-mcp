@@ -68,3 +68,6 @@ id_ed25519
 # OS
 .DS_Store
 Thumbs.db
+
+# OpenCode planning state
+.omo/

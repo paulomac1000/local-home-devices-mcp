@@ -11,6 +11,7 @@ import os
 from typing import Any
 
 from tools.constants import (
+    CAMERA_GATE_SNAPSHOTS_DIR,
     _error_response_extended,
     _success_response,
     check_write_enabled,
@@ -167,6 +168,11 @@ def _hikvision_set_motion_detection(
 ) -> str:
     """Enable/disable VMD motion detection or adjust sensitivity."""
     try:
+        if sensitivity is not None and not 0 <= sensitivity <= 100:
+            return _error_response_extended(
+                code="VALIDATION_ERROR",
+                message="sensitivity must be between 0 and 100",
+            )
         client = create_isapi_client()
         success = client.set_motion_config(enabled=enabled, sensitivity=sensitivity)
         if success:
@@ -227,7 +233,12 @@ def _hikvision_snapshot_to_file(filepath: str) -> str:
         validated_path = validate_required_string(filepath, "filepath")
         client = create_isapi_client()
         result = client.save_snapshot(filepath=validated_path)
-        return _success_response(result)
+        if result.get("saved"):
+            return _success_response(result)
+        return _error_response_extended(
+            code="ISAPI_ERROR",
+            message=result.get("error", "Failed to save snapshot"),
+        )
     except ValidationError as exc:
         return _error_response_extended(code="VALIDATION_ERROR", message=str(exc))
     except ValueError as exc:
@@ -302,7 +313,7 @@ def _hikvision_pipeline_diagnose() -> str:
         vmd_count = logs.count("Motion detected from Gate")
         call_count = logs.count("Doorbell ringing")
         mqtt_triggers = logs.count("Invoking device trigger automation")
-        snapshots_dir = "/config/www/archive/camera_gate"
+        snapshots_dir = CAMERA_GATE_SNAPSHOTS_DIR
         snapshot_files: list[str] = []
         has_snapshots = False
         try:
@@ -609,10 +620,15 @@ def register_hikvision_tools(mcp: Any) -> None:
         """
         try:
             start_tool_context()
+            check_write_enabled()
             increment_tool_count("hikvision_snapshot_to_file")
             return _hikvision_snapshot_to_file(filepath)
         except ValidationError as exc:
-            return _error_response_extended(code="VALIDATION_ERROR", message=str(exc))
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
         except Exception as exc:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 

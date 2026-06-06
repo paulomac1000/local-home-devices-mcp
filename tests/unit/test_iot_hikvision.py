@@ -4,6 +4,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from tools.constants import _success_response
 
@@ -200,7 +201,7 @@ class TestHikvisionISAPIClient:
         from tools.hikvision.isapi_client import HikvisionISAPIClient
 
         with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
-            MockSession.return_value.get.side_effect = __import__("requests").RequestException("Timeout")
+            MockSession.return_value.get.side_effect = requests.RequestException("Timeout")
             client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
             assert client.get_motion_config() is None
 
@@ -477,7 +478,7 @@ class TestHikvisionTools:
             mock_client.get_alarm_server.return_value = {
                 "url": "/api/hikvision",
                 "port": 8123,
-                "ip": "192.168.0.101",
+                "ip": "192.0.2.1",
             }
             mock_factory.return_value = mock_client
             result = _hikvision_get_alarm_server()
@@ -617,7 +618,10 @@ class TestHikvisionTools:
             patch("tools.iot_hikvision.get_container_status") as mock_status,
             patch("tools.iot_hikvision.get_container_logs") as mock_logs,
             patch("tools.iot_hikvision.os.path.isdir", return_value=True),
-            patch("tools.iot_hikvision.os.listdir", return_value=["2026-06-01_120000.jpg", "2026-06-01_120100.jpg"]),
+            patch(
+                "tools.iot_hikvision.os.listdir",
+                return_value=["2026-06-01_120000.jpg", "2026-06-01_120100.jpg"],
+            ),
         ):
             mock_status.return_value = {"running": True, "status": "running"}
             mock_logs.return_value = (
@@ -807,7 +811,7 @@ FAKE_ALARM_SERVER_XML = (
     "<id>1</id>"
     "<url>/api/hikvision</url>"
     "<protocolType>HTTP</protocolType>"
-    "<ipAddress>192.168.0.101</ipAddress>"
+    "<ipAddress>192.0.2.1</ipAddress>"
     "<portNo>8123</portNo>"
     "<authentication>none</authentication>"
     "</HttpHostNotification>"
@@ -834,7 +838,7 @@ class TestHikvisionISAPIClientDeep:
             assert result is not None
             assert result["url"] == "/api/hikvision"
             assert result["port"] == 8123
-            assert result["ip"] == "192.168.0.101"
+            assert result["ip"] == "192.0.2.1"
             assert result["protocol"] == "HTTP"
             assert result["auth_method"] == "none"
 
@@ -900,7 +904,7 @@ class TestHikvisionISAPIClientDeep:
     def test_save_snapshot_success(self, tmp_path):
         from tools.hikvision.isapi_client import HikvisionISAPIClient
 
-        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+        with patch("tools.hikvision.isapi_client.requests.Session") as _:
             client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
             client.get_snapshot = MagicMock(return_value=b"fake_jpeg_bytes")
             filepath = str(tmp_path / "test.jpg")
@@ -914,7 +918,7 @@ class TestHikvisionISAPIClientDeep:
     def test_save_snapshot_failure(self):
         from tools.hikvision.isapi_client import HikvisionISAPIClient
 
-        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+        with patch("tools.hikvision.isapi_client.requests.Session") as _:
             client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
             client.get_snapshot = MagicMock(return_value=None)
             result = client.save_snapshot(filepath="/tmp/nonexistent/test.jpg")
