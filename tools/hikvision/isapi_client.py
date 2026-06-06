@@ -254,6 +254,72 @@ class HikvisionISAPIClient:
         except Exception:
             return None
 
+    def set_motion_config(
+        self, enabled: bool | None = None, sensitivity: int | None = None
+    ) -> bool:
+        """Set motion detection configuration via read-modify-write.
+
+        Fetches current config, overrides specified fields, and PUTs the
+        complete XML back. The doorbell requires all fields on PUT.
+
+        Args:
+            enabled: Enable or disable motion detection (None = no change).
+            sensitivity: Sensitivity level 0-100 (None = no change).
+
+        Returns:
+            True if the PUT succeeded, False on any error.
+        """
+        current = self.get_motion_config()
+        if current is None:
+            # Full defaults when no current config available
+            cur_enabled = True
+            cur_sensitivity = 70
+            region_type = "grid"
+            row_gran = "18x18"
+            col_gran = "22x22"
+            grid_map = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        else:
+            cur_enabled = current["enabled"]
+            cur_sensitivity = current["sensitivity"]
+            region_type = "grid"
+            row_gran = f"{current['grid_rows']}x{current['grid_rows']}"
+            col_gran = f"{current['grid_cols']}x{current['grid_cols']}"
+            grid_map = current["grid_map"]
+
+        if enabled is not None:
+            cur_enabled = enabled
+        if sensitivity is not None:
+            cur_sensitivity = sensitivity
+
+        root = ET.Element(f"{{{ISAPI_NS}}}MotionDetection")
+        ET.SubElement(root, f"{{{ISAPI_NS}}}enabled").text = str(cur_enabled).lower()
+        ET.SubElement(root, f"{{{ISAPI_NS}}}regionType").text = region_type
+        grid = ET.SubElement(root, f"{{{ISAPI_NS}}}Grid")
+        ET.SubElement(grid, f"{{{ISAPI_NS}}}rowGranularity").text = row_gran
+        ET.SubElement(grid, f"{{{ISAPI_NS}}}columnGranularity").text = col_gran
+        layout = ET.SubElement(root, f"{{{ISAPI_NS}}}MotionDetectionLayout")
+        ET.SubElement(layout, f"{{{ISAPI_NS}}}sensitivityLevel").text = str(
+            cur_sensitivity
+        )
+        layout_inner = ET.SubElement(layout, f"{{{ISAPI_NS}}}layout")
+        ET.SubElement(layout_inner, f"{{{ISAPI_NS}}}gridMap").text = grid_map
+        body = ET.tostring(root, encoding="unicode", xml_declaration=True)
+
+        url = f"{self.base_url}/ISAPI/System/Video/inputs/channels/1/MotionDetection"
+        headers = {"Content-Type": "application/xml"}
+        try:
+            resp = self.session.put(
+                url,
+                auth=self.auth,
+                data=body,
+                headers=headers,
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            return True
+        except Exception:
+            return False
+
     def open_door(self, door_id: int = 1) -> bool:
         """Trigger the electric lock relay (open gate).
 

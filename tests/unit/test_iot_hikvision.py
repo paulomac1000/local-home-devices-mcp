@@ -296,6 +296,83 @@ class TestHikvisionISAPIClient:
             client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
             assert client.ping() is True
 
+    def test_set_motion_config_full_update(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            mock_put_resp = MagicMock(status_code=200)
+            MockSession.return_value.put.return_value = mock_put_resp
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            with patch.object(
+                client,
+                "get_motion_config",
+                return_value={
+                    "enabled": False,
+                    "sensitivity": 50,
+                    "grid_map": "FFFF",
+                    "grid_rows": 18,
+                    "grid_cols": 22,
+                },
+            ):
+                result = client.set_motion_config(enabled=True, sensitivity=60)
+                assert result is True
+                call_args = MockSession.return_value.put.call_args
+                body = call_args[1]["data"]
+                assert "<ns0:enabled>true</ns0:enabled>" in body
+                assert "<ns0:sensitivityLevel>60</ns0:sensitivityLevel>" in body
+                assert "<ns0:regionType>grid</ns0:regionType>" in body
+                assert "<ns0:rowGranularity>18x18</ns0:rowGranularity>" in body
+                assert "<ns0:columnGranularity>22x22</ns0:columnGranularity>" in body
+                assert "<ns0:gridMap>FFFF</ns0:gridMap>" in body
+
+    def test_set_motion_config_partial_update(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            mock_put_resp = MagicMock(status_code=200)
+            MockSession.return_value.put.return_value = mock_put_resp
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            with patch.object(
+                client,
+                "get_motion_config",
+                return_value={
+                    "enabled": False,
+                    "sensitivity": 50,
+                    "grid_map": "0F0F",
+                    "grid_rows": 18,
+                    "grid_cols": 22,
+                },
+            ):
+                result = client.set_motion_config(sensitivity=60)
+                assert result is True
+                call_args = MockSession.return_value.put.call_args
+                body = call_args[1]["data"]
+                assert "<ns0:enabled>false</ns0:enabled>" in body
+                assert "<ns0:sensitivityLevel>60</ns0:sensitivityLevel>" in body
+                assert "<ns0:gridMap>0F0F</ns0:gridMap>" in body
+
+    def test_set_motion_config_failure(self):
+        from tools.hikvision.isapi_client import HikvisionISAPIClient
+
+        with patch("tools.hikvision.isapi_client.requests.Session") as MockSession:
+            mock_put_resp = MagicMock(status_code=400)
+            mock_put_resp.raise_for_status.side_effect = Exception("400")
+            MockSession.return_value.put.return_value = mock_put_resp
+            client = HikvisionISAPIClient(FAKE_HOST, FAKE_USER, FAKE_PASS)
+            with patch.object(
+                client,
+                "get_motion_config",
+                return_value={
+                    "enabled": True,
+                    "sensitivity": 50,
+                    "grid_map": "FFFF",
+                    "grid_rows": 18,
+                    "grid_cols": 22,
+                },
+            ):
+                result = client.set_motion_config(enabled=False)
+                assert result is False
+
 
 class TestHikvisionTools:
     def test_container_status_success(self):
@@ -369,6 +446,102 @@ class TestHikvisionTools:
             result = _hikvision_device_info()
             assert '"MISSING_CREDENTIALS"' in result
 
+    def test_get_event_config_success(self):
+        from tools.iot_hikvision import _hikvision_get_event_config
+
+        with patch("tools.iot_hikvision.create_isapi_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.get_event_triggers.return_value = [
+                {"event_type": "VMD", "notifications": [{"method": "center"}]},
+                {"event_type": "videoloss", "notifications": [{"recurrence": "beginning"}]},
+            ]
+            mock_factory.return_value = mock_client
+            result = _hikvision_get_event_config()
+            assert '"success": true' in result
+            assert '"count": 2' in result
+            assert '"VMD"' in result
+
+    def test_get_event_config_missing_creds(self):
+        from tools.iot_hikvision import _hikvision_get_event_config
+
+        with patch("tools.iot_hikvision.create_isapi_client") as mock_factory:
+            mock_factory.side_effect = ValueError("missing creds")
+            result = _hikvision_get_event_config()
+            assert '"MISSING_CREDENTIALS"' in result
+
+    def test_get_alarm_server_success(self):
+        from tools.iot_hikvision import _hikvision_get_alarm_server
+
+        with patch("tools.iot_hikvision.create_isapi_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.get_alarm_server.return_value = {
+                "url": "/api/hikvision",
+                "port": 8123,
+                "ip": "192.168.0.101",
+            }
+            mock_factory.return_value = mock_client
+            result = _hikvision_get_alarm_server()
+            assert '"success": true' in result
+            assert '"alarm_server"' in result
+            assert '"port": 8123' in result
+
+    def test_get_alarm_server_internal_error(self):
+        from tools.iot_hikvision import _hikvision_get_alarm_server
+
+        with patch("tools.iot_hikvision.create_isapi_client") as mock_factory:
+            mock_factory.side_effect = Exception("network error")
+            result = _hikvision_get_alarm_server()
+            assert '"INTERNAL_ERROR"' in result
+
+    def test_snapshot_to_file_success(self, tmp_path):
+        from tools.iot_hikvision import _hikvision_snapshot_to_file
+
+        with patch("tools.iot_hikvision.create_isapi_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.save_snapshot.return_value = {
+                "saved": True,
+                "size_bytes": 15000,
+                "filepath": "/tmp/test.jpg",
+                "format": "jpeg",
+            }
+            mock_factory.return_value = mock_client
+            filepath = str(tmp_path / "doorbell.jpg")
+            result = _hikvision_snapshot_to_file(filepath)
+            assert '"success": true' in result
+            assert '"saved": true' in result
+            assert '"format": "jpeg"' in result
+
+    def test_snapshot_to_file_validation_error(self):
+        from tools.iot_hikvision import _hikvision_snapshot_to_file
+
+        result = _hikvision_snapshot_to_file("")
+        assert '"VALIDATION_ERROR"' in result
+
+    def test_get_motion_config_success(self):
+        from tools.iot_hikvision import _hikvision_get_motion_config
+
+        with patch("tools.iot_hikvision.create_isapi_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.get_motion_config.return_value = {
+                "enabled": True,
+                "sensitivity": 70,
+                "grid_map": "0F0F",
+                "grid_rows": 18,
+                "grid_cols": 22,
+            }
+            mock_factory.return_value = mock_client
+            result = _hikvision_get_motion_config()
+            assert '"enabled": true' in result
+            assert '"sensitivity": 70' in result
+
+    def test_get_motion_config_error(self):
+        from tools.iot_hikvision import _hikvision_get_motion_config
+
+        with patch("tools.iot_hikvision.create_isapi_client") as mock_factory:
+            mock_factory.side_effect = ValueError("Missing required env vars")
+            result = _hikvision_get_motion_config()
+            assert '"MISSING_CREDENTIALS"' in result
+
 
 class TestHikvisionToolRegistration:
     @pytest.fixture
@@ -378,9 +551,9 @@ class TestHikvisionToolRegistration:
         register_hikvision_tools(mock_mcp)
         return mock_mcp
 
-    def test_all_seven_tools_registered(self, mcp):
+    def test_all_eleven_tools_registered(self, mcp):
         hik_tools = [n for n in mcp._tools if n.startswith("hikvision_")]
-        assert len(hik_tools) == 7
+        assert len(hik_tools) == 11
 
     def test_container_status_tool(self, mcp):
         with patch(
@@ -424,6 +597,38 @@ class TestHikvisionToolRegistration:
             return_value=_json({"model": "DS-KV6113-WPE1(C)"}),
         ):
             result = mcp.get_tool("hikvision_device_info")()
+            assert json.loads(result)["success"] is True
+
+    def test_get_event_config_tool(self, mcp):
+        with patch(
+            "tools.iot_hikvision._hikvision_get_event_config",
+            return_value=_json({"triggers": [], "count": 0}),
+        ):
+            result = mcp.get_tool("hikvision_get_event_config")()
+            assert json.loads(result)["success"] is True
+
+    def test_get_alarm_server_tool(self, mcp):
+        with patch(
+            "tools.iot_hikvision._hikvision_get_alarm_server",
+            return_value=_json({"alarm_server": {"port": 8123}}),
+        ):
+            result = mcp.get_tool("hikvision_get_alarm_server")()
+            assert json.loads(result)["success"] is True
+
+    def test_get_motion_config_tool(self, mcp):
+        with patch(
+            "tools.iot_hikvision._hikvision_get_motion_config",
+            return_value=_json({"enabled": True, "sensitivity": 70}),
+        ):
+            result = mcp.get_tool("hikvision_get_motion_config")()
+            assert json.loads(result)["success"] is True
+
+    def test_snapshot_to_file_tool(self, mcp):
+        with patch(
+            "tools.iot_hikvision._hikvision_snapshot_to_file",
+            return_value=_json({"saved": True}),
+        ):
+            result = mcp.get_tool("hikvision_snapshot_to_file")(filepath="/tmp/test.jpg")
             assert json.loads(result)["success"] is True
 
     def test_exception_handler(self, mcp):

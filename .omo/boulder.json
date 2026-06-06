@@ -8,7 +8,7 @@
       "plan_name": "hikvision-diagnostic-tools",
       "status": "active",
       "started_at": "2026-06-06T13:47:17.710Z",
-      "updated_at": "2026-06-06T13:58:18.488Z",
+      "updated_at": "2026-06-06T14:03:33.687Z",
       "session_ids": [
         "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
       ],
@@ -29,6 +29,19 @@
           "status": "completed",
           "ended_at": "2026-06-06T13:58:18.488Z",
           "elapsed_ms": 294953
+        },
+        "todo:8": {
+          "task_key": "todo:8",
+          "task_label": "8",
+          "task_title": "`tools/hikvision/isapi_client.py` — Add `set_motion_config()` (TDD)",
+          "session_id": "opencode:ses_162c4ff66ffe4ppHCwYThj18M7",
+          "agent": "Sisyphus-Junior",
+          "category": "unspecified-high",
+          "updated_at": "2026-06-06T14:03:33.687Z",
+          "started_at": "2026-06-06T14:03:16.943Z",
+          "status": "completed",
+          "ended_at": "2026-06-06T14:03:33.687Z",
+          "elapsed_ms": 16744
         }
       }
     }
@@ -36,7 +49,7 @@
   "active_plan": "/home/pablo/tasmota-openbk-mcp/.omo/plans/hikvision-diagnostic-tools.md",
   "started_at": "2026-06-06T13:47:17.710Z",
   "status": "active",
-  "updated_at": "2026-06-06T13:58:18.488Z",
+  "updated_at": "2026-06-06T14:03:33.687Z",
   "session_ids": [
     "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
   ],
@@ -57,6 +70,19 @@
       "status": "completed",
       "ended_at": "2026-06-06T13:58:18.488Z",
       "elapsed_ms": 294953
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "`tools/hikvision/isapi_client.py` — Add `set_motion_config()` (TDD)",
+      "session_id": "opencode:ses_162c4ff66ffe4ppHCwYThj18M7",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-06T14:03:33.687Z",
+      "started_at": "2026-06-06T14:03:16.943Z",
+      "status": "completed",
+      "ended_at": "2026-06-06T14:03:33.687Z",
+      "elapsed_ms": 16744
     }
   },
   "agent": "atlas"

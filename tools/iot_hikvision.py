@@ -146,6 +146,72 @@ def _hikvision_device_info() -> str:
         return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
 
+def _hikvision_get_motion_config() -> str:
+    """Fetch VMD motion detection configuration from the doorbell."""
+    try:
+        client = create_isapi_client()
+        config = client.get_motion_config()
+        if config:
+            return _success_response(config)
+        return _error_response_extended(
+            code="ISAPI_ERROR",
+            message="Failed to fetch motion detection config.",
+        )
+    except ValueError as exc:
+        return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
+def _hikvision_get_event_config() -> str:
+    """Fetch event trigger configuration from the doorbell."""
+    try:
+        client = create_isapi_client()
+        triggers = client.get_event_triggers()
+        if triggers is not None:
+            return _success_response({"triggers": triggers, "count": len(triggers)})
+        return _error_response_extended(
+            code="ISAPI_ERROR",
+            message="Failed to fetch event triggers.",
+        )
+    except ValueError as exc:
+        return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
+def _hikvision_get_alarm_server() -> str:
+    """Fetch alarm server (HTTP notification host) configuration."""
+    try:
+        client = create_isapi_client()
+        server = client.get_alarm_server()
+        if server:
+            return _success_response({"alarm_server": server})
+        return _error_response_extended(
+            code="ISAPI_ERROR",
+            message="Failed to fetch alarm server config.",
+        )
+    except ValueError as exc:
+        return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
+def _hikvision_snapshot_to_file(filepath: str) -> str:
+    """Capture a JPEG snapshot and save it directly to a file on disk."""
+    try:
+        validated_path = validate_required_string(filepath, "filepath")
+        client = create_isapi_client()
+        result = client.save_snapshot(filepath=validated_path)
+        return _success_response(result)
+    except ValidationError as exc:
+        return _error_response_extended(code="VALIDATION_ERROR", message=str(exc))
+    except ValueError as exc:
+        return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
 def register_hikvision_tools(mcp: Any) -> None:
     """Register Hikvision doorbell tools with the MCP server."""
 
@@ -343,5 +409,91 @@ def register_hikvision_tools(mcp: Any) -> None:
             start_tool_context()
             increment_tool_count("hikvision_device_info")
             return _hikvision_device_info()
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_get_event_config() -> str:
+        """Fetch event trigger configuration from the doorbell via ISAPI.
+
+        Returns the list of event triggers (VMD, videoloss, etc.) configured
+        on the doorbell along with their notification methods and schedules.
+
+        Returns:
+            JSON with triggers list and count.
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_get_event_config")
+            return _hikvision_get_event_config()
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_get_alarm_server() -> str:
+        """Fetch alarm server (HTTP notification host) configuration from the doorbell.
+
+        Returns the HTTP host notification settings configured on the doorbell
+        (IP address, port, URL path, protocol, and authentication method).
+
+        Returns:
+            JSON with alarm_server dict.
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_get_alarm_server")
+            return _hikvision_get_alarm_server()
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_snapshot_to_file(filepath: str) -> str:
+        """Capture a JPEG snapshot from the doorbell and save it to a file on disk.
+
+        Writes the camera snapshot directly to the specified file path instead
+        of returning base64 data. Useful for saving snapshots for later analysis.
+
+        Args:
+            filepath: Absolute path where the JPEG file should be saved.
+
+        Returns:
+            JSON with saved (bool), size_bytes (int), filepath (str), and format (str).
+
+        @since v1.4.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_snapshot_to_file")
+            return _hikvision_snapshot_to_file(filepath)
+        except ValidationError as exc:
+            return _error_response_extended(code="VALIDATION_ERROR", message=str(exc))
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_get_motion_config() -> str:
+        """Fetch VMD motion detection configuration from the doorbell.
+
+        Returns the motion detection configuration including enabled status,
+        sensitivity level, and grid settings from the doorbell ISAPI endpoint.
+
+        Returns:
+            JSON with motion config fields (enabled, sensitivity, grid_map,
+            grid_rows, grid_cols).
+
+        @since v1.5.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_get_motion_config")
+            return _hikvision_get_motion_config()
         except Exception as exc:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
