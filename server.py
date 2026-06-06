@@ -180,15 +180,31 @@ def _delete_session(session_id: str) -> None:
 
 
 def _validate_origin(request: Any) -> bool:
-    """Validate the Origin header to prevent DNS rebinding."""
+    """Validate the Origin header to prevent DNS rebinding.
+
+    Checks against allowed origins from MCP_ALLOWED_ORIGINS env var
+    (comma-separated list of pattern URLs like 'http://localhost:*').
+    Also allows localhost, 127.0.0.1, and BIND_HOST by default.
+    """
     origin = request.headers.get("origin", "")
     if not origin:
         return False
     from urllib.parse import urlparse
 
     parsed = urlparse(origin)
+
+    # Always allow localhost and loopback
     if parsed.hostname in ("localhost", "127.0.0.1") or parsed.hostname == BIND_HOST:
         return True
+
+    # Check against configurable allowed origins
+    allowed = [p.strip() for p in MCP_ALLOWED_ORIGINS.split(",")]
+    for pattern in allowed:
+        pattern_parsed = urlparse(pattern)
+        if pattern_parsed.hostname == parsed.hostname:
+            if pattern_parsed.port is None or str(pattern_parsed.port) == "*" or str(parsed.port) == str(pattern_parsed.port):
+                return True
+
     return False
 
 
