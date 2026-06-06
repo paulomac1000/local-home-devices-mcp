@@ -162,6 +162,25 @@ All read-only operations - no device state is modified.
 | `openhasp_health` | [READ] | Composite health score 0-100 |
 | `openhasp_hardware_test` | [WRITE] | Automated diagnostic sequence |
 
+### Hikvision Doorbell
+
+| Tool | Risk | Description |
+|------|------|-------------|
+| `hikvision_container_status` | [READ] | Get Docker container running status and health |
+| `hikvision_container_logs` | [READ] | Fetch recent container logs (VMD events, calls, errors) |
+| `hikvision_device_info` | [READ] | Fetch doorbell device metadata via ISAPI |
+| `hikvision_check_vmd` | [READ] | Check VMD motion events -- ISAPI health canary |
+| `hikvision_take_snapshot` | [READ] | Capture JPEG snapshot from doorbell camera |
+| `hikvision_get_motion_config` | [READ] | Fetch VMD motion detection configuration |
+| `hikvision_get_event_config` | [READ] | Fetch ISAPI event trigger configuration |
+| `hikvision_get_alarm_server` | [READ] | Fetch HTTP notification host (alarm server) config |
+| `hikvision_isapi_health` | [READ] | Composite health check (container + VMD + call events) |
+| `hikvision_pipeline_diagnose` | [READ] | Full pipeline trace (container to ISAPI to events to MQTT to snapshots) |
+| `hikvision_open_gate` | [WRITE] | Trigger electric lock relay to open gate |
+| `hikvision_set_motion_detection` | [WRITE] | Enable/disable VMD or adjust sensitivity (write-guarded) |
+| `hikvision_snapshot_to_file` | [WRITE] | Capture JPEG and save directly to disk (write-guarded) |
+| `hikvision_restart_container` | [DESTRUCTIVE] | Restart the Docker container |
+
 ## Configuration
 
 All configuration is via environment variables. See `.env.example` for a complete template.
@@ -205,6 +224,8 @@ All configuration is via environment variables. See `.env.example` for a complet
 - `tools/iot_tuya.py` - Tuya device cloud + local control + diagnostics (10 tools)
 - `tools/iot_openhasp.py` - OpenHASP panel control, diagnostics, Telnet (20 tools)
 - `tools/openhasp/` - OpenHASP HTTP, Telnet, diagnostics helpers
+- `tools/iot_hikvision.py` - Hikvision doorbell tools (14 tools)
+- `tools/hikvision/` - ISAPI HTTP client, Docker socket helper
 
 ## Supported Devices
 
@@ -236,16 +257,24 @@ All configuration is via environment variables. See `.env.example` for a complet
 - **Protocol**: HTTP API for config/files + raw TCP Telnet for control (NOT telnetlib)
 - **Telnet**: Uses raw TCP socket - MQTT PUB format when MQTT connected, MSGR format otherwise
 
+### Hikvision Doorbell
+
+- **Models**: DS-KV6113-WPE1(C), DS-KV8113-WPE1(C), VillaVTO series
+- **Features**: Camera snapshot, motion detection (VMD), gate control, event triggers, ISAPI health
+- **Detection**: Docker container `hikvision-doorbell` manages ISAPI connection
+- **Protocol**: ISAPI HTTP Digest Auth + Docker Unix socket API
+- **Requirements**: Docker container `hikvision-doorbell`, ISAPI credentials (`HIKVISION_DOORBELL_HOST/USER/PASSWORD`)
+
 ## Testing
 
 The project has a 4-tier test hierarchy (see `AGENTS.md` for details):
 
 | Suite | Tests | Coverage | Command |
 |-------|-------|----------|---------|
-| Unit | 205 | **>80%** | `pytest tests/unit/ -v --tb=short` |
-| Integration | 20 | **66%** | `pytest tests/integration/ -q` |
-| Smoke | 17 | HTTP validation | `pytest tests/smoke/ -q` |
-| E2E | 6 | HTTP validation | `pytest tests/e2e/ -q` |
+| Unit | 378 | **>80%** | `pytest tests/unit/ -v --tb=short` |
+| Integration | 25 | **66%** | `pytest tests/integration/ -q` |
+| Smoke | 25 | HTTP validation | `pytest tests/smoke/ -q` |
+| E2E | 9 | HTTP validation | `pytest tests/e2e/ -q` |
 
 Unit tests run in CI. Integration, smoke, and e2e tests skip when their dependencies (MQTT broker, running server) are absent.
 

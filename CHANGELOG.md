@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.5.0] — 2026-06-06
+
+### Added
+- **Hikvision diagnostic tools** (7 new tools) — motion detection config (get/set), event trigger inspection, alarm server config, snapshot-to-file, composite ISAPI health check, cross-layer pipeline diagnosis
+- `hikvision_get_motion_config` — fetch VMD motion detection configuration (enabled, sensitivity, grid map)
+- `hikvision_set_motion_detection` — enable/disable VMD or adjust sensitivity via read-modify-write ISAPI (write-guarded)
+- `hikvision_get_event_config` — list all ISAPI event triggers with notification details
+- `hikvision_get_alarm_server` — fetch HTTP notification host (alarm server) configuration
+- `hikvision_snapshot_to_file` — capture JPEG and save directly to specified file path (write-guarded)
+- `hikvision_isapi_health` — composite health check aggregating container status, VMD events, and call events
+- `hikvision_pipeline_diagnose` — full pipeline trace across container, ISAPI, events, MQTT triggers, and snapshot filesystem
+- `HikvisionISAPIClient` extended with 5 new methods: `get_motion_config`, `set_motion_config`, `get_event_triggers`, `get_alarm_server`, `save_snapshot`
+- `count_call_events()` Docker client function — counts doorbell ring events in container logs
+- `CAMERA_GATE_SNAPSHOTS_DIR` constant for snapshot archive path (env-overridable)
+- 33 new unit tests, 5 integration, 8 smoke, 3 E2E tests for Hikvision diagnostic tools
+
+### Changed
+- `hikvision_check_vmd` soft-deprecated — docstring updated to recommend `hikvision_isapi_health`
+- `hikvision_snapshot_to_file` risk level corrected from READ to WRITE (writes to filesystem)
+- `_hikvision_set_motion_detection` adds sensitivity bounds validation (0-100)
+- `_hikvision_pipeline_diagnose` uses `CAMERA_GATE_SNAPSHOTS_DIR` constant instead of hardcoded path
+- Test fixture IPs replaced with RFC 5737 documentation addresses (`192.0.2.1`)
+
 All notable changes to this project.
 
 ## [1.4.0] — 2026-06-01
