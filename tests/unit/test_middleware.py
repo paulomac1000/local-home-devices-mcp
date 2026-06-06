@@ -154,6 +154,32 @@ class TestAuthMiddleware:
         assert result["authenticated"] is True
         assert result["user"] == "bearer"
 
+    def test_validate_api_key_with_none_when_key_configured(self):
+        """validate_api_key(None) should return False when key is configured, covering line 62."""
+        am = AuthMiddleware()
+        am._allowed_api_key = "test-key"
+        assert am.validate_api_key(None) is False
+        assert am.validate_api_key("") is False
+
+    def test_authenticate_with_invalid_api_key_present(self):
+        """authenticate() with wrong API key should fail and log, covering lines 102, 109-110."""
+        am = AuthMiddleware()
+        am._allowed_api_key = "valid-key"
+        result = am.authenticate({"x-api-key": "wrong-key"})
+        assert result["authenticated"] is False
+        assert result["user"] is None
+        assert "error" in result
+        assert "invalid" in result["error"]["message"].lower()
+
+    def test_authenticate_missing_api_key_when_key_configured(self):
+        """Missing API key header when API key configured should report missing key error, covering line 114."""
+        am = AuthMiddleware()
+        am._allowed_token = ""
+        am._allowed_api_key = "test-key"
+        result = am.authenticate({})  # No auth headers
+        assert result["authenticated"] is False
+        assert "Missing API key" in result.get("error", {}).get("message", "")
+
 
 # =============================================================================
 # RateLimitMiddleware
