@@ -14,7 +14,7 @@ expected_tools: 51
 use_codecov: true
 use_semgrep: true
 use_dependabot: true
-package_ecosystems: ["github-actions", "pip"]
+package_ecosystems: ["github-actions", "pip", "docker"]
 use_docs_validation: false
 
 services:
