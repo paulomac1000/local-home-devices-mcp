@@ -163,6 +163,31 @@ def _hikvision_get_motion_config() -> str:
         return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
 
 
+def _hikvision_set_motion_detection(
+    enabled: bool | None = None, sensitivity: int | None = None
+) -> str:
+    """Enable/disable VMD motion detection or adjust sensitivity."""
+    try:
+        client = create_isapi_client()
+        success = client.set_motion_config(enabled=enabled, sensitivity=sensitivity)
+        if success:
+            return _success_response(
+                {
+                    "enabled": enabled,
+                    "sensitivity": sensitivity,
+                    "message": "Motion detection config updated",
+                }
+            )
+        return _error_response_extended(
+            code="ISAPI_ERROR",
+            message="Failed to update motion detection config. Check ISAPI connectivity.",
+        )
+    except ValueError as exc:
+        return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
 def _hikvision_get_event_config() -> str:
     """Fetch event trigger configuration from the doorbell."""
     try:
@@ -206,6 +231,114 @@ def _hikvision_snapshot_to_file(filepath: str) -> str:
         return _success_response(result)
     except ValidationError as exc:
         return _error_response_extended(code="VALIDATION_ERROR", message=str(exc))
+    except ValueError as exc:
+        return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
+def _hikvision_isapi_health(since: str = "4h") -> str:
+    """Composite health check for the doorbell pipeline.
+
+    Combines Docker container status, VMD events, and call events
+    into a single health assessment. Does not call ISAPI directly --
+    uses Docker client functions that inspect container logs.
+
+    Args:
+        since: Time window for event counting (default "4h").
+
+    Returns:
+        JSON with overall health status, container/vmd/calls details, and issues.
+    """
+    try:
+        status = get_container_status()
+        vmd = count_vmd_events(since=since)
+        calls = count_call_events(since=since)
+        container_ok = status.get("running", False)
+        vmd_ok = vmd.get("vmd_count", 0) > 0
+        calls_ok = calls.get("call_count", 0) > 0
+        if container_ok and (vmd_ok or calls_ok):
+            overall = "healthy"
+        elif container_ok and not vmd_ok and not calls_ok:
+            overall = "degraded"
+        else:
+            overall = "down"
+        issues = []
+        if not container_ok:
+            issues.append(f"Container not running: {status.get('status', 'unknown')}")
+        if not vmd_ok and calls_ok:
+            issues.append("VMD event pipeline is dead (call events still flowing)")
+        if not vmd_ok and not calls_ok:
+            issues.append("No VMD or call events — ISAPI may be disconnected")
+        return _success_response(
+            {
+                "overall": overall,
+                "since": since,
+                "container": status,
+                "vmd": vmd,
+                "calls": calls,
+                "issues": issues,
+            }
+        )
+    except ValueError as exc:
+        return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
+    except Exception as exc:
+        return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+
+def _hikvision_pipeline_diagnose() -> str:
+    """Cross-layer diagnostic across all 5 layers of the doorbell pipeline.
+
+    Layers: Docker container -> ISAPI auth -> events (VMD/call) ->
+    MQTT triggers -> snapshot files on disk.
+
+    Returns:
+        JSON with per-layer status, overall health, and issues list.
+    """
+    try:
+        status = get_container_status()
+        container_running = status.get("running", False)
+        logs = get_container_logs(since="1h", tail=100)
+        isapi_auth = "Connected to doorbell" in logs
+        vmd_count = logs.count("Motion detected from Gate")
+        call_count = logs.count("Doorbell ringing")
+        mqtt_triggers = logs.count("Invoking device trigger automation")
+        snapshots_dir = "/config/www/archive/camera_gate"
+        snapshot_files: list[str] = []
+        has_snapshots = False
+        try:
+            if os.path.isdir(snapshots_dir):
+                snapshot_files = sorted(os.listdir(snapshots_dir), reverse=True)[:5]
+                has_snapshots = len(snapshot_files) > 0
+        except OSError:
+            pass
+        issues: list[str] = []
+        if not container_running:
+            issues.append("Cannot start — docker container is not running")
+        if not isapi_auth:
+            issues.append("Layer 1: ISAPI not authenticated")
+        if vmd_count == 0 and call_count == 0:
+            issues.append("Layer 2: No events of any kind")
+        elif vmd_count == 0 and call_count > 0:
+            issues.append("Layer 2: VMD events stopped (call events still flowing)")
+        if mqtt_triggers == 0:
+            issues.append("Layer 3: No MQTT automation triggers")
+        if not has_snapshots:
+            issues.append("Layer 4: No snapshots on disk")
+        overall = "healthy" if len(issues) == 0 else "degraded"
+        return _success_response(
+            {
+                "overall": overall,
+                "layers": {
+                    "container": {"running": container_running, "status": status.get("status", "unknown")},
+                    "isapi": {"authenticated": isapi_auth},
+                    "events": {"vmd_count": vmd_count, "call_count": call_count},
+                    "mqtt": {"triggers_published": mqtt_triggers},
+                    "snapshots": {"has_snapshots": has_snapshots, "recent_files": snapshot_files, "directory": snapshots_dir},
+                },
+                "issues": issues,
+            }
+        )
     except ValueError as exc:
         return _error_response_extended(code="MISSING_CREDENTIALS", message=str(exc))
     except Exception as exc:
@@ -495,5 +628,86 @@ def register_hikvision_tools(mcp: Any) -> None:
             start_tool_context()
             increment_tool_count("hikvision_get_motion_config")
             return _hikvision_get_motion_config()
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_set_motion_detection(
+        enabled: bool | None = None, sensitivity: int | None = None
+    ) -> str:
+        """Enable or disable VMD motion detection, or adjust sensitivity.
+
+        WARNING: Write operation -- modifies the doorbell's motion detection config.
+        Sends XML PUT to ISAPI Smart/MotionDetection endpoint with digest auth.
+        Uses read-modify-write: fetches current config, overrides the specified
+        fields, and writes the complete XML back.
+
+        Args:
+            enabled: Enable (True) or disable (False) motion detection.
+            sensitivity: Sensitivity level 0-100.
+
+        Returns:
+            JSON with enabled, sensitivity, and message fields.
+
+        @since v1.5.0
+        """
+        try:
+            start_tool_context()
+            check_write_enabled()
+            increment_tool_count("hikvision_set_motion_detection")
+            return _hikvision_set_motion_detection(enabled, sensitivity)
+        except ValidationError as exc:
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_isapi_health(since: str = "4h") -> str:
+        """Check doorbell pipeline health: container + VMD + call events.
+
+        Composite health check that combines Docker container status,
+        VMD motion events, and doorbell call events into a single
+        health assessment (healthy/degraded/down).
+
+        Args:
+            since: Time window for event counting (default "4h"). Use "8h" overnight.
+
+        Returns:
+            JSON with overall health, container info, vmd/calls event counts,
+            and any issues detected.
+
+        @since v1.6.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_isapi_health")
+            return _hikvision_isapi_health(since)
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def hikvision_pipeline_diagnose() -> str:
+        """Cross-layer diagnostic of the entire doorbell pipeline.
+
+        Inspects 5 layers: Docker container, ISAPI auth, events (VMD/call),
+        MQTT automation triggers, and snapshot files on disk. Returns per-layer
+        status and a consolidated issues list.
+
+        Returns:
+            JSON with overall health, per-layer status dict, and issues list.
+
+        @since v1.6.0
+        """
+        try:
+            start_tool_context()
+            increment_tool_count("hikvision_pipeline_diagnose")
+            return _hikvision_pipeline_diagnose()
         except Exception as exc:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))

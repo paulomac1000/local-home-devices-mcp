@@ -542,6 +542,108 @@ class TestHikvisionTools:
             result = _hikvision_get_motion_config()
             assert '"MISSING_CREDENTIALS"' in result
 
+    def test_set_motion_detection_success(self):
+        from tools.iot_hikvision import _hikvision_set_motion_detection
+
+        with patch("tools.iot_hikvision.create_isapi_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.set_motion_config.return_value = True
+            mock_factory.return_value = mock_client
+            result = _hikvision_set_motion_detection(enabled=True, sensitivity=80)
+            assert '"success": true' in result
+            assert '"enabled": true' in result
+            assert '"sensitivity": 80' in result
+            assert '"message"' in result
+
+    def test_set_motion_detection_error(self):
+        from tools.iot_hikvision import _hikvision_set_motion_detection
+
+        with patch("tools.iot_hikvision.create_isapi_client") as mock_factory:
+            mock_client = MagicMock()
+            mock_client.set_motion_config.return_value = False
+            mock_factory.return_value = mock_client
+            result = _hikvision_set_motion_detection()
+            assert '"ISAPI_ERROR"' in result
+
+    def test_isapi_health_healthy(self):
+        from tools.iot_hikvision import _hikvision_isapi_health
+
+        with (
+            patch("tools.iot_hikvision.get_container_status") as mock_status,
+            patch("tools.iot_hikvision.count_vmd_events") as mock_vmd,
+            patch("tools.iot_hikvision.count_call_events") as mock_calls,
+        ):
+            mock_status.return_value = {"running": True, "status": "running"}
+            mock_vmd.return_value = {"vmd_count": 5, "isapi_healthy": True, "check_window": "4h"}
+            mock_calls.return_value = {"call_count": 2, "has_calls": True, "check_window": "4h"}
+            result = _hikvision_isapi_health(since="4h")
+            assert '"overall": "healthy"' in result
+            assert '"vmd_count": 5' in result
+            assert '"call_count": 2' in result
+
+    def test_isapi_health_degraded(self):
+        from tools.iot_hikvision import _hikvision_isapi_health
+
+        with (
+            patch("tools.iot_hikvision.get_container_status") as mock_status,
+            patch("tools.iot_hikvision.count_vmd_events") as mock_vmd,
+            patch("tools.iot_hikvision.count_call_events") as mock_calls,
+        ):
+            mock_status.return_value = {"running": True, "status": "running"}
+            mock_vmd.return_value = {"vmd_count": 0, "isapi_healthy": False, "check_window": "4h"}
+            mock_calls.return_value = {"call_count": 0, "has_calls": False, "check_window": "4h"}
+            result = _hikvision_isapi_health(since="4h")
+            assert '"overall": "degraded"' in result
+            assert "No VMD or call events" in result
+
+    def test_isapi_health_down(self):
+        from tools.iot_hikvision import _hikvision_isapi_health
+
+        with (
+            patch("tools.iot_hikvision.get_container_status") as mock_status,
+            patch("tools.iot_hikvision.count_vmd_events") as mock_vmd,
+            patch("tools.iot_hikvision.count_call_events") as mock_calls,
+        ):
+            mock_status.return_value = {"running": False, "status": "stopped"}
+            mock_vmd.return_value = {"vmd_count": 0, "isapi_healthy": False, "check_window": "4h"}
+            mock_calls.return_value = {"call_count": 0, "has_calls": False, "check_window": "4h"}
+            result = _hikvision_isapi_health(since="4h")
+            assert '"overall": "down"' in result
+
+    def test_pipeline_diagnose_healthy(self):
+        from tools.iot_hikvision import _hikvision_pipeline_diagnose
+
+        with (
+            patch("tools.iot_hikvision.get_container_status") as mock_status,
+            patch("tools.iot_hikvision.get_container_logs") as mock_logs,
+            patch("tools.iot_hikvision.os.path.isdir", return_value=True),
+            patch("tools.iot_hikvision.os.listdir", return_value=["2026-06-01_120000.jpg", "2026-06-01_120100.jpg"]),
+        ):
+            mock_status.return_value = {"running": True, "status": "running"}
+            mock_logs.return_value = (
+                "Connected to doorbell: Gate type: VillaVTO\n"
+                "Motion detected from Gate\n"
+                "Doorbell ringing\n"
+                "Invoking device trigger automation\n"
+            )
+            result = _hikvision_pipeline_diagnose()
+            assert '"overall": "healthy"' in result
+            assert '"authenticated": true' in result
+            assert '"vmd_count": 1' in result
+
+    def test_pipeline_diagnose_degraded(self):
+        from tools.iot_hikvision import _hikvision_pipeline_diagnose
+
+        with (
+            patch("tools.iot_hikvision.get_container_status") as mock_status,
+            patch("tools.iot_hikvision.get_container_logs") as mock_logs,
+        ):
+            mock_status.return_value = {"running": False, "status": "stopped"}
+            mock_logs.return_value = ""
+            result = _hikvision_pipeline_diagnose()
+            assert '"overall": "degraded"' in result
+            assert "Cannot start" in result
+
 
 class TestHikvisionToolRegistration:
     @pytest.fixture
@@ -551,9 +653,9 @@ class TestHikvisionToolRegistration:
         register_hikvision_tools(mock_mcp)
         return mock_mcp
 
-    def test_all_eleven_tools_registered(self, mcp):
+    def test_all_fourteen_tools_registered(self, mcp):
         hik_tools = [n for n in mcp._tools if n.startswith("hikvision_")]
-        assert len(hik_tools) == 11
+        assert len(hik_tools) == 14
 
     def test_container_status_tool(self, mcp):
         with patch(

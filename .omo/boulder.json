@@ -8,7 +8,7 @@
       "plan_name": "hikvision-diagnostic-tools",
       "status": "active",
       "started_at": "2026-06-06T13:47:17.710Z",
-      "updated_at": "2026-06-06T14:03:33.687Z",
+      "updated_at": "2026-06-06T14:07:52.341Z",
       "session_ids": [
         "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
       ],
@@ -42,6 +42,19 @@
           "status": "completed",
           "ended_at": "2026-06-06T14:03:33.687Z",
           "elapsed_ms": 16744
+        },
+        "todo:13": {
+          "task_key": "todo:13",
+          "task_label": "13",
+          "task_title": "`tools/iot_hikvision.py` — Add `_hikvision_set_motion_detection()` wrapper + registration (TDD)",
+          "session_id": "opencode:ses_162c0ca21ffeyDCdGI2ub1HezV",
+          "agent": "Sisyphus-Junior",
+          "category": "unspecified-high",
+          "updated_at": "2026-06-06T14:07:52.341Z",
+          "started_at": "2026-06-06T14:06:32.015Z",
+          "status": "completed",
+          "ended_at": "2026-06-06T14:07:52.341Z",
+          "elapsed_ms": 80326
         }
       }
     }
@@ -49,7 +62,7 @@
   "active_plan": "/home/pablo/tasmota-openbk-mcp/.omo/plans/hikvision-diagnostic-tools.md",
   "started_at": "2026-06-06T13:47:17.710Z",
   "status": "active",
-  "updated_at": "2026-06-06T14:03:33.687Z",
+  "updated_at": "2026-06-06T14:07:52.341Z",
   "session_ids": [
     "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
   ],
@@ -83,6 +96,19 @@
       "status": "completed",
       "ended_at": "2026-06-06T14:03:33.687Z",
       "elapsed_ms": 16744
+    },
+    "todo:13": {
+      "task_key": "todo:13",
+      "task_label": "13",
+      "task_title": "`tools/iot_hikvision.py` — Add `_hikvision_set_motion_detection()` wrapper + registration (TDD)",
+      "session_id": "opencode:ses_162c0ca21ffeyDCdGI2ub1HezV",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-06-06T14:07:52.341Z",
+      "started_at": "2026-06-06T14:06:32.015Z",
+      "status": "completed",
+      "ended_at": "2026-06-06T14:07:52.341Z",
+      "elapsed_ms": 80326
     }
   },
   "agent": "atlas"

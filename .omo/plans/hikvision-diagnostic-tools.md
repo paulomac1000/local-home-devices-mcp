@@ -652,7 +652,7 @@ Max Concurrent: 8 (Wave 1)
 
   **Commit**: YES (groups with 9-11)
 
-- [ ] 13. `tools/iot_hikvision.py` — Add `_hikvision_set_motion_detection()` wrapper + registration (TDD)
+- [x] 13. `tools/iot_hikvision.py` — Add `_hikvision_set_motion_detection()` wrapper + registration (TDD)
 
   **What to do**:
   - **RED**: Write unit tests `test_set_motion_detection_success`, `test_set_motion_detection_error`
@@ -704,7 +704,7 @@ Max Concurrent: 8 (Wave 1)
   - Message: `feat(hikvision): register set_motion_detection tool with write guard`
   - Files: `tools/iot_hikvision.py`
 
-- [ ] 14. `tools/iot_hikvision.py` — Add `_hikvision_isapi_health()` wrapper + registration (TDD)
+- [x] 14. `tools/iot_hikvision.py` — Add `_hikvision_isapi_health()` wrapper + registration (TDD)
 
   **What to do**:
   - **RED**: Write unit tests: `test_isapi_health_healthy`, `test_isapi_health_degraded`, `test_isapi_health_down`
@@ -763,7 +763,7 @@ Max Concurrent: 8 (Wave 1)
   - Message: `feat(hikvision): register isapi_health and pipeline_diagnose composite tools`
   - Files: `tools/iot_hikvision.py`
 
-- [ ] 15. `tools/iot_hikvision.py` — Add `_hikvision_pipeline_diagnose()` wrapper + registration (TDD)
+- [x] 15. `tools/iot_hikvision.py` — Add `_hikvision_pipeline_diagnose()` wrapper + registration (TDD)
 
   **What to do**:
   - **RED**: Write unit tests `test_pipeline_diagnose_healthy`, `test_pipeline_diagnose_degraded`
@@ -816,7 +816,7 @@ Max Concurrent: 8 (Wave 1)
 
   **Commit**: YES (groups with Task 14)
 
-- [ ] 16. `tests/unit/test_iot_hikvision.py` — Update tool registration count + add registration tests
+- [x] 16. `tests/unit/test_iot_hikvision.py` — Update tool registration count + add registration tests
 
   **What to do**:
   - Update `test_all_seven_tools_registered`: change assertion `len(hik_tools) == 7` → `len(hik_tools) == 14`
