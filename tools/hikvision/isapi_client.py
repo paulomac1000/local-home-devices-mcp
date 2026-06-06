@@ -179,13 +179,9 @@ class HikvisionISAPIClient:
                     ),
                     "notifications": [],
                 }
-                notif_list = trigger_elem.find(
-                    f"{{{ISAPI_NS}}}EventTriggerNotificationList"
-                )
+                notif_list = trigger_elem.find(f"{{{ISAPI_NS}}}EventTriggerNotificationList")
                 if notif_list is not None:
-                    for notif_elem in notif_list.findall(
-                        f"{{{ISAPI_NS}}}EventTriggerNotification"
-                    ):
+                    for notif_elem in notif_list.findall(f"{{{ISAPI_NS}}}EventTriggerNotification"):
                         notif_id = notif_elem.find(f"{{{ISAPI_NS}}}id")
                         method = notif_elem.find(f"{{{ISAPI_NS}}}notificationMethod")
                         recurrence = notif_elem.find(f"{{{ISAPI_NS}}}recurrence")
@@ -196,9 +192,7 @@ class HikvisionISAPIClient:
                                 else ""
                             ),
                             "method": (
-                                method.text.strip()
-                                if method is not None and method.text
-                                else ""
+                                method.text.strip() if method is not None and method.text else ""
                             ),
                             "recurrence": (
                                 recurrence.text.strip()
@@ -298,9 +292,7 @@ class HikvisionISAPIClient:
         ET.SubElement(grid, f"{{{ISAPI_NS}}}rowGranularity").text = row_gran
         ET.SubElement(grid, f"{{{ISAPI_NS}}}columnGranularity").text = col_gran
         layout = ET.SubElement(root, f"{{{ISAPI_NS}}}MotionDetectionLayout")
-        ET.SubElement(layout, f"{{{ISAPI_NS}}}sensitivityLevel").text = str(
-            cur_sensitivity
-        )
+        ET.SubElement(layout, f"{{{ISAPI_NS}}}sensitivityLevel").text = str(cur_sensitivity)
         layout_inner = ET.SubElement(layout, f"{{{ISAPI_NS}}}layout")
         ET.SubElement(layout_inner, f"{{{ISAPI_NS}}}gridMap").text = grid_map
         body = ET.tostring(root, encoding="unicode", xml_declaration=True)

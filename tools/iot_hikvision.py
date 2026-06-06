@@ -8,7 +8,6 @@ Integrates Docker CLI, ISAPI HTTP API, and MQTT health monitoring.
 
 import base64
 import os
-from pathlib import Path
 from typing import Any
 
 from tools.constants import (
@@ -330,11 +329,18 @@ def _hikvision_pipeline_diagnose() -> str:
             {
                 "overall": overall,
                 "layers": {
-                    "container": {"running": container_running, "status": status.get("status", "unknown")},
+                    "container": {
+                        "running": container_running,
+                        "status": status.get("status", "unknown"),
+                    },
                     "isapi": {"authenticated": isapi_auth},
                     "events": {"vmd_count": vmd_count, "call_count": call_count},
                     "mqtt": {"triggers_published": mqtt_triggers},
-                    "snapshots": {"has_snapshots": has_snapshots, "recent_files": snapshot_files, "directory": snapshots_dir},
+                    "snapshots": {
+                        "has_snapshots": has_snapshots,
+                        "recent_files": snapshot_files,
+                        "directory": snapshots_dir,
+                    },
                 },
                 "issues": issues,
             }

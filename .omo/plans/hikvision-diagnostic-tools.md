@@ -869,7 +869,7 @@ Max Concurrent: 8 (Wave 1)
   - Message: `test(hikvision): update tool registration count to 14`
   - Files: `tests/unit/test_iot_hikvision.py`
 
-- [ ] 17. `tests/integration/test_hikvision_tools.py` — Add 5 integration tests
+- [x] 17. `tests/integration/test_hikvision_tools.py` — Add 5 integration tests
 
   **What to do**:
   - Add test methods to `TestHikvisionIntegration` class:
@@ -917,7 +917,7 @@ Max Concurrent: 8 (Wave 1)
   - Message: `test(hikvision): add integration tests for 5 new diagnostic tools`
   - Files: `tests/integration/test_hikvision_tools.py`
 
-- [ ] 18. `tests/smoke/test_hikvision_diagnostic.py` — Create smoke test file
+- [x] 18. `tests/smoke/test_hikvision_diagnostic.py` — Create smoke test file
 
   **What to do**:
   - Create new file `tests/smoke/test_hikvision_diagnostic.py`
@@ -963,7 +963,7 @@ Max Concurrent: 8 (Wave 1)
   - Message: `test(hikvision): add smoke tests for diagnostic tools`
   - Files: `tests/smoke/test_hikvision_diagnostic.py`
 
-- [ ] 19. `tests/e2e/test_hikvision_workflow.py` — Add 3 E2E tests + update tool count
+- [x] 19. `tests/e2e/test_hikvision_workflow.py` — Add 3 E2E tests + update tool count
 
   **What to do**:
   - Add test methods to `TestHikvisionE2E` class:

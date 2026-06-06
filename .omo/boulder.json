@@ -8,7 +8,7 @@
       "plan_name": "hikvision-diagnostic-tools",
       "status": "active",
       "started_at": "2026-06-06T13:47:17.710Z",
-      "updated_at": "2026-06-06T14:08:40.379Z",
+      "updated_at": "2026-06-06T14:13:11.483Z",
       "session_ids": [
         "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
       ],
@@ -60,12 +60,14 @@
           "task_key": "todo:17",
           "task_label": "17",
           "task_title": "`tests/integration/test_hikvision_tools.py` — Add 5 integration tests",
-          "session_id": "opencode:ses_162bcd1c2ffef4G5ULa7TIJVHO",
+          "session_id": "opencode:ses_162bb4bf5ffeaopdKSRd7Ar7q8",
           "agent": "Sisyphus-Junior",
           "category": "unspecified-high",
-          "updated_at": "2026-06-06T14:08:40.379Z",
           "started_at": "2026-06-06T14:08:40.379Z",
-          "status": "running"
+          "status": "completed",
+          "updated_at": "2026-06-06T14:13:11.483Z",
+          "ended_at": "2026-06-06T14:13:11.483Z",
+          "elapsed_ms": 271104
         }
       }
     }
@@ -73,7 +75,7 @@
   "active_plan": "/home/pablo/tasmota-openbk-mcp/.omo/plans/hikvision-diagnostic-tools.md",
   "started_at": "2026-06-06T13:47:17.710Z",
   "status": "active",
-  "updated_at": "2026-06-06T14:08:40.379Z",
+  "updated_at": "2026-06-06T14:13:11.483Z",
   "session_ids": [
     "opencode:ses_162ea30cbffeiNDhUUt3pQXDlV"
   ],
@@ -125,12 +127,14 @@
       "task_key": "todo:17",
       "task_label": "17",
       "task_title": "`tests/integration/test_hikvision_tools.py` — Add 5 integration tests",
-      "session_id": "opencode:ses_162bcd1c2ffef4G5ULa7TIJVHO",
+      "session_id": "opencode:ses_162bb4bf5ffeaopdKSRd7Ar7q8",
       "agent": "Sisyphus-Junior",
       "category": "unspecified-high",
-      "updated_at": "2026-06-06T14:08:40.379Z",
       "started_at": "2026-06-06T14:08:40.379Z",
-      "status": "running"
+      "status": "completed",
+      "updated_at": "2026-06-06T14:13:11.483Z",
+      "ended_at": "2026-06-06T14:13:11.483Z",
+      "elapsed_ms": 271104
     }
   },
   "agent": "atlas"
