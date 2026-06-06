@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import threading
+import time
 import uuid
 from typing import Any
 
@@ -57,7 +58,7 @@ ENABLE_WRITE_OPERATIONS = os.getenv("ENABLE_WRITE_OPERATIONS", "0") == "1"
 _DEFAULT_OCTETS = START_IP.rsplit(".", 1)[0]
 DEFAULT_NETWORK_RANGE = NETWORK_RANGE or f"{_DEFAULT_OCTETS}.0/24"
 
-TOOLS_VERSION = "1.4.0"
+TOOLS_VERSION = "1.5.0"
 
 # =============================================================================
 # TOOL INVOCATION COUNTERS
@@ -82,6 +83,15 @@ def get_tool_counts() -> dict[str, int]:
         Dict mapping tool names to invocation counts.
     """
     return dict(_tool_invocation_counts)
+
+
+def record_invocation(tool_name: str) -> None:
+    """Record a tool invocation for health endpoint metrics.
+
+    Args:
+        tool_name: Name of the tool being invoked.
+    """
+    increment_tool_count(tool_name)
 
 
 # =============================================================================
@@ -317,6 +327,28 @@ def _build_meta(
     return meta
 
 
+def build_meta(tool_name: str, start_time: float | None = None, **extra: Any) -> dict[str, Any]:
+    """Build _meta envelope and record the invocation.
+
+    Wraps _build_meta() and adds invocation recording as a side effect.
+    The request_id is read from the current tool context so it matches
+    log lines for the same invocation.
+
+    Args:
+        tool_name: Tool name for invocation counting.
+        start_time: Optional time.monotonic() timestamp for duration_ms.
+        extra: Additional metadata fields.
+
+    Returns:
+        Dictionary with request_id, tool_version and extra fields.
+    """
+    record_invocation(tool_name)
+    duration_ms = None
+    if start_time is not None:
+        duration_ms = int((time.monotonic() - start_time) * 1000)
+    return _build_meta(duration_ms=duration_ms, **extra)
+
+
 def _success_response(
     data: Any,
     duration_ms: int | None = None,
@@ -421,6 +453,36 @@ def _error_response_extended(
             ),
         }
     )
+
+
+def _error_dict_extended(
+    code: str,
+    message: str,
+    retryable: bool = False,
+    suggestion: str | None = None,
+    available_names: list[str] | None = None,
+) -> dict[str, Any]:
+    """Return an error dict for internal function composition (before JSON serialization).
+
+    Unlike _error_response_extended which returns a JSON string, this variant
+    returns a dict suitable for composing with other dicts before serialization.
+
+    Args:
+        code: Machine-readable error code (UPPER_SNAKE_CASE).
+        message: Human-readable error description.
+        retryable: Whether the operation can be safely retried.
+        suggestion: Actionable next step for the user.
+        available_names: List of valid alternatives when relevant.
+
+    Returns:
+        Dict with success=False and error details.
+    """
+    error: dict[str, Any] = {"code": code, "message": message, "retryable": retryable}
+    if suggestion:
+        error["suggestion"] = suggestion
+    if available_names:
+        error["available_names"] = available_names[:50]
+    return {"success": False, "error": error}
 
 
 # =============================================================================
