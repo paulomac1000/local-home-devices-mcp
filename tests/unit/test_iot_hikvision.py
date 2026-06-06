@@ -138,10 +138,7 @@ class TestHikvisionDockerClient:
 
         with patch("tools.hikvision.docker_client.get_container_logs") as mock_logs:
             mock_logs.return_value = (
-                "Doorbell ringing\n"
-                "Motion detected from Gate\n"
-                "Doorbell ringing\n"
-                "Doorbell ringing"
+                "Doorbell ringing\nMotion detected from Gate\nDoorbell ringing\nDoorbell ringing"
             )
             result = count_call_events(since="4h")
             assert result["call_count"] == 3
