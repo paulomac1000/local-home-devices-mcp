@@ -151,18 +151,43 @@ class TestConfigToolsMocked:
 
     def test_get_full_info_parses_openbk_status(self, mcp_client):
         """Mock OpenBK Status 0 response and verify all fields are parsed."""
+        # Real OpenBK Status 0 JSON structure:
+        # StatusFWR.Version, StatusNET.Mac, StatusMQT.MqttHost,
+        # StatusSTS.Wifi.{SSId,RSSI,Signal}, StatusSTS.Uptime,
+        # StatusLOG.SetOption[0] (hex-encoded flags)
         mock_openbk_status = {
             "Status": {
                 "Module": 0,
                 "DeviceName": "OpenBK_Test",
-                "Firmware": "OpenBK7231N_1.17.306",
+                "FriendlyName": ["OpenBK_Test_1", "OpenBK_Test_2"],
+                "Topic": "BK7231N_OPENBK_TEST",
+            },
+            "StatusFWR": {
+                "Version": "OpenBK7231N_1.17.306",
+                "BuildDateTime": "Nov  5 2023 10:01:03",
+                "Hardware": "BK7231N",
+            },
+            "StatusNET": {
+                "Hostname": "OpenBK_Test",
+                "IPAddress": "192.0.2.101",
                 "Mac": "AA:BB:CC:DD:EE:11",
-                "MQTT": {"MqttHost": "192.0.2.100"},
-                "Wifi": {"SSId": "Test_SSID", "RSSI": 62, "Signal": -69},
+            },
+            "StatusMQT": {
+                "MqttHost": "192.0.2.100",
+                "MqttPort": 1883,
+                "MqttClient": "BK7231N_OPENBK_TEST",
+            },
+            "StatusSTS": {
                 "Uptime": "0T02:35:00",
-                "genericFlags": 0,
-                "genericFlags2": 0,
-            }
+                "UptimeSec": 9300,
+                "Wifi": {"SSId": "Test_SSID", "RSSI": 62, "Signal": -69},
+            },
+            "StatusLOG": {
+                "SetOption": ["000A8009", "2805C80001000600003C5A0A000000000000"],
+            },
+            "StatusPRM": {
+                "Uptime": 9300,
+            },
         }
 
         with patch("tools.iot_discovery._detect_device_type", return_value="openbk"), \
@@ -196,14 +221,24 @@ class TestConfigToolsMocked:
         mock_tasmota_status = {
             "Status": {
                 "DeviceName": "Tasmota_Test",
+                "FriendlyName": ["Tasmota_Test"],
+            },
+            "StatusFWR": {
                 "Version": "Tasmota_14.2.0",
+            },
+            "StatusNET": {
                 "Mac": "AA:BB:CC:DD:EE:FF",
-                "MQTT": {"MqttHost": "192.0.2.1"},
-                "Wifi": {"SSId": "Test_SSID", "RSSI": 80, "Signal": -50},
+            },
+            "StatusMQT": {
+                "MqttHost": "192.0.2.1",
+            },
+            "StatusSTS": {
                 "Uptime": "0T01:00:00",
-                "SetOption00": "00",
-                "SetOption01": "08",
-            }
+                "UptimeSec": 3600,
+                "Wifi": {"SSId": "Test_SSID", "RSSI": 80, "Signal": -50},
+            },
+            "SetOption00": "00",
+            "SetOption01": "08",
         }
 
         with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \

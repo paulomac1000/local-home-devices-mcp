@@ -915,14 +915,15 @@ class TestGetFullInfo:
                     mock_session.get_json.return_value = {
                         "Status": {
                             "DeviceName": "OpenBK_Test",
-                            "Firmware": "1.17.0",
-                            "Mac": "AA:BB:CC:DD:EE:FF",
-                            "MQTT": {"MqttHost": "192.168.1.10"},
+                        },
+                        "StatusFWR": {"Version": "1.17.0"},
+                        "StatusNET": {"Mac": "AA:BB:CC:DD:EE:FF"},
+                        "StatusMQT": {"MqttHost": "192.168.1.10"},
+                        "StatusSTS": {
                             "Wifi": {"SSId": "HomeWiFi", "RSSI": "55", "Signal": "-40"},
                             "Uptime": "123456",
-                            "genericFlags": 8421376,
-                            "genericFlags2": 0,
-                        }
+                        },
+                        "StatusLOG": {"SetOption": ["808000", "0"]},
                     }
                     mock_session_cls.return_value = mock_session
 
@@ -952,13 +953,15 @@ class TestGetFullInfo:
                     mock_session.get_json.return_value = {
                         "Status": {
                             "DeviceName": "Tasmota_Test",
-                            "Firmware": "14.0.0(tasmota)",
-                            "Mac": "FF:EE:DD:CC:BB:AA",
+                        },
+                        "StatusFWR": {"Version": "14.0.0(tasmota)"},
+                        "StatusNET": {"Mac": "FF:EE:DD:CC:BB:AA"},
+                        "StatusSTS": {
                             "Wifi": {"SSId": "MyNetwork", "RSSI": "85", "Signal": "-45"},
                             "Uptime": "3600",
-                            "SetOption0": "1",
-                            "SetOption19": "1",
-                        }
+                        },
+                        "SetOption0": "1",
+                        "SetOption19": "1",
                     }
                     mock_session_cls.return_value = mock_session
 
@@ -980,12 +983,10 @@ class TestGetFullInfo:
                 with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
                     mock_session = MagicMock()
                     mock_session.get_json.return_value = {
-                        "Status": {
-                            "DeviceName": "Test",
-                            "PRG": "2.0.0",
-                            "MQTT": {},
-                            "Wifi": {},
-                        }
+                        "Status": {"DeviceName": "Test"},
+                        "StatusFWR": {"PRG": "2.0.0"},
+                        "StatusMQT": {},
+                        "StatusSTS": {"Wifi": {}},
                     }
                     mock_session_cls.return_value = mock_session
 

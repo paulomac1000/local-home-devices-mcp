@@ -570,28 +570,36 @@ def _get_full_info(identifier: str, timeout_seconds: int = 10) -> str:
             )
         return _error_response_extended(code="DEVICE_ERROR", message=msg)
 
-    # Parse the Status JSON response
-    status = data.get("Status", data)
-    device_name = data.get("DeviceName", status.get("DeviceName", ""))
+    # Parse the Status 0 JSON response
+    # Each Status* block is a top-level key in the JSON
+    status_main = data.get("Status", {})      # DeviceName, FriendlyName, Topic
+    status_fwr = data.get("StatusFWR", {})     # Version, BuildDateTime, Hardware
+    status_net = data.get("StatusNET", {})     # Mac, IPAddress, Hostname
+    status_mqt = data.get("StatusMQT", {})     # MqttHost, MqttPort, MqttClient
+    status_sts = data.get("StatusSTS", {})     # Uptime, UptimeSec, Wifi, POWER
+    status_prm = data.get("StatusPRM", {})     # Uptime, GroupTopic, RestartReason
+    status_log = data.get("StatusLOG", {})     # SetOption array (flags)
 
-    # Firmware version
+    device_name = data.get("DeviceName", status_main.get("DeviceName", ""))
+
+    # Firmware version -- StatusFWR has Version
     version = (
-        status.get("Firmware")
-        or status.get("Version")
-        or status.get("Program_version")
-        or status.get("PRG")
+        status_fwr.get("Version")
+        or status_fwr.get("Program_version")
+        or status_fwr.get("PRG")
         or "Unknown"
     )
 
-    # MAC address
-    mac = status.get("Mac") or status.get("MAC") or data.get("Mac", "")
+    # MAC address -- StatusNET has Mac
+    mac = status_net.get("Mac") or status_net.get("MAC", "")
 
-    # MQTT info
-    mqtt_raw = status.get("MQTT", {})
-    mqtt_host = mqtt_raw.get("MqttHost", "") if isinstance(mqtt_raw, dict) else ""
+    # MQTT info -- StatusMQT has MqttHost
+    mqtt_host = ""
+    if isinstance(status_mqt, dict):
+        mqtt_host = status_mqt.get("MqttHost", "")
 
-    # WiFi info
-    wifi_raw = status.get("Wifi", status.get("WiFi", {}))
+    # WiFi info -- StatusSTS has Wifi block
+    wifi_raw = status_sts.get("Wifi", status_sts.get("WiFi", {}))
     if isinstance(wifi_raw, dict):
         wifi_ssid = wifi_raw.get("SSId", "")
         wifi_rssi = wifi_raw.get("RSSI", "")
@@ -601,17 +609,26 @@ def _get_full_info(identifier: str, timeout_seconds: int = 10) -> str:
         wifi_rssi = ""
         wifi_signal = ""
 
-    # Uptime
-    uptime = status.get("Uptime", status.get("UptimeSec", ""))
+    # Uptime -- StatusSTS or StatusPRM
+    uptime = status_sts.get("Uptime", status_prm.get("Uptime", ""))
+    uptime_sec = status_sts.get("UptimeSec", status_prm.get("UptimeSec", 0))
 
-    # Flags (OpenBK uses genericFlags, Tasmota uses SetOption)
+    # Flags -- OpenBK: StatusLOG.SetOption[0] hex as generic_flags
+    # Tasmota: StatusLOG.SetOption array
     flags_data: dict[str, Any] = {}
     if dev_type == "openbk":
-        flags_data["generic_flags"] = status.get("genericFlags", 0)
-        flags_data["generic_flags_2"] = status.get("genericFlags2", 0)
+        set_option = status_log.get("SetOption", [])
+        if isinstance(set_option, list) and len(set_option) >= 2:
+            raw_0 = int(set_option[0], 16) if isinstance(set_option[0], str) else set_option[0]
+            raw_1 = int(set_option[1], 16) if isinstance(set_option[1], str) else set_option[1]
+            flags_data["generic_flags"] = raw_0
+            flags_data["generic_flags_2"] = raw_1
+        elif isinstance(set_option, list) and len(set_option) >= 1:
+            raw_0 = int(set_option[0], 16) if isinstance(set_option[0], str) else set_option[0]
+            flags_data["generic_flags"] = raw_0
     elif dev_type == "tasmota":
         set_options: dict[str, Any] = {}
-        for key, val in status.items():
+        for key, val in data.items():
             if key.startswith("SetOption"):
                 set_options[key] = val
         flags_data["set_options"] = set_options
@@ -627,6 +644,7 @@ def _get_full_info(identifier: str, timeout_seconds: int = 10) -> str:
         "wifi_rssi": wifi_rssi,
         "wifi_signal": wifi_signal,
         "uptime": uptime,
+        "uptime_sec": uptime_sec,
         "flags": flags_data,
         "source": "Status 0",
     }
