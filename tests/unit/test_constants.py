@@ -145,7 +145,7 @@ class TestToolManifest:
             assert not missing, f"Tool '{tool_name}' missing fields: {missing}"
 
     def test_new_config_tool_manifests_have_descriptions(self):
-        """Verify all 7 new v1.6.0 config tool manifests have non-empty descriptions."""
+        """Verify all 8 new v1.6.0 config tool manifests have non-empty descriptions."""
         from tools.constants import TOOL_MANIFESTS
 
         new_tools = [
@@ -154,6 +154,7 @@ class TestToolManifest:
             "iot_configure_mqtt",
             "iot_set_gpio",
             "iot_execute_command",
+            "iot_set_startup_command",
             "iot_start_ha_discovery",
             "iot_get_full_info",
         ]

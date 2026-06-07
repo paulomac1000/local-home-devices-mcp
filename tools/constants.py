@@ -696,6 +696,10 @@ TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
         privacy="metadata",
     ),
     "iot_set_power": _make_write_manifest("iot_set_power", timeout_ms=10000),
+    "iot_set_startup_command": {
+        **_make_write_manifest("iot_set_startup_command", timeout_ms=10000),
+        "description": "Set device startup command / autoexec on OpenBK via /startup_command",
+    },
     "iot_set_brightness": _make_write_manifest("iot_set_brightness", timeout_ms=10000),
     "iot_restart_device": _make_destructive_manifest(
         "iot_restart_device",

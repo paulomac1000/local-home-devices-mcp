@@ -198,6 +198,15 @@ def _build_url(device_type: str, endpoint_name: str, **params: Any) -> tuple[str
             f"[UNSUPPORTED_TYPE] execute_command is not supported for {device_type}"
         )
 
+    if endpoint_name == "set_startup_command":
+        if device_type == "openbk":
+            cmd = str(params.get("command", ""))
+            encoded = urllib.parse.quote(cmd, safe="")
+            return (f"/startup_command?startup_cmd=1&data={encoded}", "openbk")
+        raise DeviceConnectionError(
+            "[UNSUPPORTED_TYPE] set_startup_command is only supported on OpenBK"
+        )
+
     # --- Dispatch by device type ---
 
     if device_type == "openbk":

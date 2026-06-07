@@ -16,6 +16,7 @@ from tools.iot_config import (
     _set_flags,
     _set_gpio,
     _set_name,
+    _set_startup_command,
     _start_ha_discovery,
     register_iot_config_tools,
 )
@@ -573,10 +574,33 @@ class TestExecuteCommand:
                 assert data["error"]["code"] == "COMMAND_BLOCKED"
 
     def test_execute_command_blocked_backlog(self):
-        """'backlog' — blocked without force."""
+        """'backlog' with destructive sub-commands — blocked without force."""
         with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
             with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
-                result = _execute_command("192.168.1.101", "backlog Power1 ON")
+                result = _execute_command("192.168.1.101", "backlog format 1")
+                data = json.loads(result)
+                assert data["success"] is False
+                assert data["error"]["code"] == "COMMAND_BLOCKED"
+                assert "destructive sub-commands" in data["error"]["message"]
+
+    def test_execute_command_safe_backlog_allowed(self):
+        """'backlog' with safe sub-commands (e.g. 'Power1 ON') — allowed."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_form.return_value = "OK"
+                    mock_session_cls.return_value = mock_session
+
+                    result = _execute_command("192.168.1.101", "backlog Power1 ON")
+                    data = json.loads(result)
+                    assert data["success"] is True
+
+    def test_execute_command_backlog_with_reset_blocked(self):
+        """'backlog reset 1' — contains destructive sub-command, blocked."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                result = _execute_command("192.168.1.101", "backlog reset 1")
                 data = json.loads(result)
                 assert data["success"] is False
                 assert data["error"]["code"] == "COMMAND_BLOCKED"
@@ -899,6 +923,99 @@ class TestStartHADiscovery:
 
 
 # ---------------------------------------------------------------------------
+# _set_startup_command / iot_set_startup_command
+# ---------------------------------------------------------------------------
+
+
+class TestSetStartupCommand:
+    """Tests for _set_startup_command / iot_set_startup_command — startup command."""
+
+    def test_set_startup_command_openbk_success(self):
+        """Set startup command on OpenBK — succeeds via get_form."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session_cls.return_value = mock_session
+
+                    result = _set_startup_command(
+                        "192.168.1.101",
+                        "SetPinRole 6 1; SetPinChannel 6 1",
+                    )
+                    data = json.loads(result)
+
+                    assert data["success"] is True
+                    assert data["data"]["device_type"] == "openbk"
+                    assert "SetPinRole" in data["data"]["command"]
+                    assert data["data"]["ip"] == "192.168.1.101"
+
+    def test_set_startup_command_empty_identifier(self):
+        """Empty identifier — INVALID_PARAM."""
+        result = _set_startup_command("", "cmd")
+        data = json.loads(result)
+        assert data["success"] is False
+        assert data["error"]["code"] == "INVALID_PARAM"
+
+    def test_set_startup_command_empty_command(self):
+        """Empty command — INVALID_PARAM."""
+        result = _set_startup_command("192.168.1.101", "")
+        data = json.loads(result)
+        assert data["success"] is False
+        assert data["error"]["code"] == "INVALID_PARAM"
+
+    def test_set_startup_command_name_not_resolved(self):
+        """Unknown device — NAME_NOT_RESOLVED."""
+        with patch("tools.iot_config._resolve_or_fail", return_value=None):
+            result = _set_startup_command("UnknownDevice", "cmd")
+            data = json.loads(result)
+            assert data["success"] is False
+            assert data["error"]["code"] == "NAME_NOT_RESOLVED"
+
+    def test_set_startup_command_device_not_found(self):
+        """No IoT device — DEVICE_NOT_FOUND."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.200"):
+            with patch("tools.iot_discovery._detect_device_type", return_value=None):
+                result = _set_startup_command("192.168.1.200", "cmd")
+                data = json.loads(result)
+                assert data["success"] is False
+                assert data["error"]["code"] == "DEVICE_NOT_FOUND"
+
+    def test_set_startup_command_tasmota_unsupported(self):
+        """Tasmota — UNSUPPORTED_TYPE."""
+        from tools.http_session import DeviceConnectionError
+
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_form.side_effect = DeviceConnectionError(
+                        "[UNSUPPORTED_TYPE] set_startup_command is only supported on OpenBK"
+                    )
+                    mock_session_cls.return_value = mock_session
+
+                    result = _set_startup_command("192.168.1.100", "cmd")
+                    data = json.loads(result)
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "UNSUPPORTED_TYPE"
+
+    def test_set_startup_command_device_connection_error(self):
+        """Device unreachable — DEVICE_ERROR."""
+        from tools.http_session import DeviceConnectionError
+
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_form.side_effect = DeviceConnectionError("Timeout")
+                    mock_session_cls.return_value = mock_session
+
+                    result = _set_startup_command("192.168.1.101", "cmd")
+                    data = json.loads(result)
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "DEVICE_ERROR"
+
+
+# ---------------------------------------------------------------------------
 # _get_full_info / iot_get_full_info
 # ---------------------------------------------------------------------------
 
@@ -1077,8 +1194,8 @@ class TestGetFullInfo:
 class TestRegistrationWrappers:
     """Tests for MCP tool registration and wrapper exception handlers."""
 
-    def test_registration_creates_seven_tools(self, mock_mcp):
-        """register_iot_config_tools registers exactly 7 tools."""
+    def test_registration_creates_eight_tools(self, mock_mcp):
+        """register_iot_config_tools registers exactly 8 tools."""
         register_iot_config_tools(mock_mcp)
         assert "iot_set_flags" in mock_mcp._tools
         assert "iot_set_name" in mock_mcp._tools
@@ -1086,8 +1203,9 @@ class TestRegistrationWrappers:
         assert "iot_set_gpio" in mock_mcp._tools
         assert "iot_execute_command" in mock_mcp._tools
         assert "iot_start_ha_discovery" in mock_mcp._tools
+        assert "iot_set_startup_command" in mock_mcp._tools
         assert "iot_get_full_info" in mock_mcp._tools
-        assert len(mock_mcp._tools) == 7
+        assert len(mock_mcp._tools) == 8
 
     def test_iot_set_flags_wrapper(self, mock_mcp):
         """iot_set_flags wrapper delegates to _set_flags and succeeds."""
@@ -1168,6 +1286,19 @@ class TestRegistrationWrappers:
                     data = json.loads(result)
                     assert data["success"] is True
 
+    def test_iot_set_startup_command_wrapper(self, mock_mcp):
+        """iot_set_startup_command wrapper succeeds."""
+        register_iot_config_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_set_startup_command")
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session_cls.return_value = mock_session
+                    result = fn("192.168.1.101", "SetPinRole 6 1")
+                    data = json.loads(result)
+                    assert data["success"] is True
+
     def test_iot_get_full_info_wrapper(self, mock_mcp):
         """iot_get_full_info wrapper succeeds."""
         register_iot_config_tools(mock_mcp)
@@ -1243,6 +1374,16 @@ class TestRegistrationWrappers:
             data = json.loads(result)
             assert data["success"] is False
             assert "fail" in data["error"]["message"]
+
+    def test_set_startup_command_wrapper_exception_handler(self, mock_mcp):
+        """iot_set_startup_command handles Exception from internal function."""
+        register_iot_config_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_set_startup_command")
+        with patch("tools.iot_config._set_startup_command", side_effect=RuntimeError("boom")):
+            result = fn("192.168.1.101", "cmd")
+            data = json.loads(result)
+            assert data["success"] is False
+            assert "boom" in data["error"]["message"]
 
     def test_get_full_info_wrapper_exception_handler(self, mock_mcp):
         """iot_get_full_info handles Exception from internal function."""
@@ -1349,6 +1490,21 @@ class TestWriteGuardDisabled:
                     mock_session = MagicMock()
                     mock_session_cls.return_value = mock_session
                     result = fn("192.168.1.101")
+                    data = json.loads(result)
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "WRITE_DISABLED"
+
+    def test_set_startup_command_rejected_when_write_disabled(self, mock_mcp, monkeypatch):
+        """iot_set_startup_command returns WRITE_DISABLED when writes are off."""
+        monkeypatch.setattr("tools.constants.ENABLE_WRITE_OPERATIONS", False)
+        register_iot_config_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_set_startup_command")
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session_cls.return_value = mock_session
+                    result = fn("192.168.1.101", "cmd")
                     data = json.loads(result)
                     assert data["success"] is False
                     assert data["error"]["code"] == "WRITE_DISABLED"

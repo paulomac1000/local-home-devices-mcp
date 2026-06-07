@@ -35,6 +35,7 @@ __all__ = [
     "_execute_command",
     "_start_ha_discovery",
     "_get_full_info",
+    "_set_startup_command",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -417,6 +418,25 @@ def _execute_command(
         first_word = command.strip().split()[0] if command.strip() else ""
         for blocked in _BLOCKED_COMMANDS:
             if first_word.lower() == blocked.lower():
+                # Smart check: allow 'backlog' if no destructive sub-commands
+                if blocked == "backlog":
+                    rest = command.strip()[len(first_word):].strip().lower()
+                    has_blocked = any(
+                        bad in rest for bad in ("format", "reset", "restart", "ota", "flash")
+                    )
+                    if has_blocked:
+                        return _error_response_extended(
+                            code="COMMAND_BLOCKED",
+                            message=(
+                                f"Command '{command}' is blocked. "
+                                f"'backlog' contains destructive sub-commands."
+                            ),
+                            suggestion=(
+                                "Remove destructive sub-commands or pass force=True."
+                            ),
+                        )
+                    # Safe backlog — allow it
+                    continue
                 return _error_response_extended(
                     code="COMMAND_BLOCKED",
                     message=(
@@ -424,8 +444,7 @@ def _execute_command(
                         f"'{first_word}' requires force=True to execute."
                     ),
                     suggestion=(
-                        "Pass force=True to bypass this safety check. "
-                        "Blocked commands: Format, reset, restart, OtaUrl, flash, backlog."
+                        "Pass force=True to bypass this safety check."
                     ),
                 )
 
@@ -526,6 +545,58 @@ def _start_ha_discovery(
         return _error_response_extended(code="DEVICE_ERROR", message=msg)
 
 
+def _set_startup_command(identifier: str, command: str, timeout_seconds: int = 10) -> str:
+    """Set the startup command (autoexec) on an OpenBK device.
+
+    The startup command persists across reboots and is the only HTTP-based
+    way to persist GPIO configuration on OpenBK devices.
+
+    Args:
+        identifier: IP address or device name.
+        command: Startup command string (e.g. "SetPinRole 6 1; SetPinChannel 6 1").
+        timeout_seconds: Request timeout in seconds.
+
+    Returns:
+        JSON string with result.
+    """
+    from tools.iot_discovery import _detect_device_type
+
+    try:
+        identifier = validate_required_string(identifier, "identifier")
+        command = validate_required_string(command, "command")
+    except ValidationError as exc:
+        return _error_response_extended(code="INVALID_PARAM", message=str(exc))
+
+    ip_address = _resolve_or_fail(identifier)
+    if not ip_address:
+        return _build_unresolved_response(identifier)
+
+    device_type = _detect_device_type(ip_address, timeout_seconds)
+    if not device_type:
+        return _error_response_extended(
+            code="DEVICE_NOT_FOUND",
+            message=f"No IoT device found at {ip_address}",
+        )
+
+    try:
+        url_path, dev_type = _build_url(device_type, "set_startup_command", command=command)
+        session = _DeviceHttpSession(f"http://{ip_address}", default_timeout=timeout_seconds)
+        session.get_form(url_path)
+        return _success_response(
+            {
+                "device_type": dev_type,
+                "command": command,
+                "ip": ip_address,
+                "message": "Startup command set. Device will execute on next boot.",
+            }
+        )
+    except DeviceConnectionError as exc:
+        msg = str(exc)
+        if msg.startswith("[UNSUPPORTED_TYPE]"):
+            return _error_response_extended(code="UNSUPPORTED_TYPE", message=msg)
+        return _error_response_extended(code="DEVICE_ERROR", message=msg)
+
+
 def _get_full_info(identifier: str, timeout_seconds: int = 10) -> str:
     """Get comprehensive device information including MAC, version, flags, MQTT, WiFi.
 
@@ -620,7 +691,9 @@ def _get_full_info(identifier: str, timeout_seconds: int = 10) -> str:
         set_option = status_log.get("SetOption", [])
         if isinstance(set_option, list) and len(set_option) >= 2:
             raw_0 = int(set_option[0], 16) if isinstance(set_option[0], str) else set_option[0]
-            raw_1 = int(set_option[1], 16) if isinstance(set_option[1], str) else set_option[1]
+            raw_1_hex = set_option[1] if isinstance(set_option[1], str) else str(set_option[1])
+            # SetOption[1] may contain >32 bits on some OBK versions — mask to uint32
+            raw_1 = int(raw_1_hex[-8:] if len(raw_1_hex) > 8 else raw_1_hex, 16)
             flags_data["generic_flags"] = raw_0
             flags_data["generic_flags_2"] = raw_1
         elif isinstance(set_option, list) and len(set_option) >= 1:
@@ -908,6 +981,42 @@ def register_iot_config_tools(mcp: Any) -> None:
             check_write_enabled()
             increment_tool_count("iot_start_ha_discovery")
             return _start_ha_discovery(identifier, prefix, timeout_seconds)
+        except ValidationError as exc:
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                retryable=False,
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def iot_set_startup_command(
+        identifier: str, command: str, timeout_seconds: int = 10
+    ) -> str:
+        """Set device startup command (autoexec) on an OpenBK device.
+
+        The startup command is the only HTTP-based way to persist GPIO
+        pin configuration across reboots on OpenBK devices. Critical for
+        device automation without Web App access.
+
+        Args:
+            identifier: IP address or device name.
+            command: Startup command string (e.g. "SetPinRole 6 1; SetPinChannel 6 1").
+            timeout_seconds: Request timeout in seconds (default 10).
+
+        Returns:
+            JSON with result.
+
+        @since v1.6.0
+        """
+        try:
+            start_tool_context()
+            check_write_enabled()
+            increment_tool_count("iot_set_startup_command")
+            return _set_startup_command(identifier, command, timeout_seconds)
         except ValidationError as exc:
             return _error_response_extended(
                 code="WRITE_DISABLED",

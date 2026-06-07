@@ -146,9 +146,42 @@ def _mqtt_get_state(topic_prefix: str, timeout_seconds: int = 10) -> str:
             pass
 
     if not received_messages:
+        # Check if device has any active GPIO channels
+        try:
+            from tools.iot_devices import _get_device_info
+            from tools.iot_discovery import _resolve_ip
+
+            ip = _resolve_ip(topic_prefix)
+            if ip:
+                info_str = _get_device_info(topic_prefix)
+                info = json.loads(info_str) if isinstance(info_str, str) else info_str
+                if info.get("success"):
+                    dev_info = (
+                        info.get("data", info).get("info", info.get("data", {}))
+                    )
+                    channels = dev_info.get("channels", 1)
+                    if channels == 0:
+                        return _success_response(
+                            {
+                                "state": "unknown",
+                                "reason": "no_active_channels",
+                                "message": (
+                                    "Device is connected to MQTT but has no GPIO channels "
+                                    "configured. State topics are not published for "
+                                    "channel-less devices."
+                                ),
+                            }
+                        )
+        except Exception:
+            pass
+
         return _error_response_extended(
             code="TIMEOUT",
             message="No state message received within timeout",
+            suggestion=(
+                "Device may be connected to MQTT but not publishing state. "
+                "Use iot_get_device_info to check if GPIO channels are configured."
+            ),
         )
 
     latest = received_messages[-1]
