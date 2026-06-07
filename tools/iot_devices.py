@@ -95,6 +95,26 @@ def _get_openbk_status(ip: str, timeout: int = 5) -> dict[str, Any]:
                 "reason": reboot_match.group(2),
             }
 
+        try:
+            resp0 = requests.get(f"http://{ip}/cm?cmnd=Status%200", timeout=timeout)
+            if resp0.status_code == 200:
+                data0 = resp0.json()
+                status_sts = data0.get("StatusSTS", {})
+                status_net = data0.get("StatusNET", {})
+                wifi = status_sts.get("Wifi", {})
+                status["ssid"] = wifi.get("SSId")
+                status["signal"] = wifi.get("Signal")
+                if not status.get("rssi"):
+                    status["rssi"] = wifi.get("RSSI")
+                status["ip"] = status_net.get("IPAddress")
+                status["gateway"] = status_net.get("Gateway")
+                status["hostname"] = status_net.get("Hostname")
+                status["dns"] = status_net.get("DNSServer1")
+                if not status.get("mac"):
+                    status["mac"] = status_net.get("Mac")
+        except Exception:
+            pass
+
         return status
     except Exception as exc:
         return {"error": str(exc)}

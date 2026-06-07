@@ -124,7 +124,7 @@ class TestConfigToolsLive:
         assert data["success"] is False
 
     def test_set_flags_name_not_found(self, mcp_client):
-        """Write tool with nonexistent name — safe error path, no HTTP to device."""
+        """Write tool with nonexistent name -- safe error path, no HTTP to device."""
         data = _get_result(
             mcp_client, "iot_set_flags", identifier="NoSuchDevice_XYZ", flags=0,
         )
@@ -133,7 +133,69 @@ class TestConfigToolsLive:
 
 
 # ============================================================================
-# Mocked tests — always run, use HTTP mocking, offline-safe
+# Write-cycle tests -- read-modify-write-restore on the real device
+# ============================================================================
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(not _device_reachable(), reason=_DEVICE_SKIP_REASON)
+class TestConfigWriteCycle:
+    """Read-modify-write-restore tests against the real OpenBK device.
+
+    These tests toggle flag 0 (OBK_FLAG_MQTT_BROADCASTLEDPARAMSTOGETHER)
+    which is harmless to change, and always restore the original value
+    even if the test fails.
+    """
+
+    def test_set_flags_read_modify_write_restore(self, mcp_client):
+        """Toggle flag 0 via iot_set_flags, verify, and restore original."""
+        # 1. Read current flags
+        data = _get_result(mcp_client, "iot_get_full_info", identifier=_REAL_DEVICE_IP)
+        assert data["success"] is True
+        assert data["data"]["device_type"] == "openbk", (
+            f"Test requires OpenBK device, got {data['data']['device_type']}"
+        )
+        original_flags = data["data"]["flags"]["generic_flags"]
+        assert isinstance(original_flags, int)
+
+        # 2. Toggle bit 0 (flag 0: OBK_FLAG_MQTT_BROADCASTLEDPARAMSTOGETHER)
+        target_flags = original_flags ^ 1
+
+        try:
+            # 3. Apply new flags
+            set_data = _get_result(
+                mcp_client, "iot_set_flags",
+                identifier=_REAL_DEVICE_IP, flags=target_flags,
+            )
+            assert set_data["success"] is True
+
+            # 4. Verify the change took effect
+            verify_data = _get_result(
+                mcp_client, "iot_get_full_info", identifier=_REAL_DEVICE_IP,
+            )
+            assert verify_data["success"] is True
+            actual = verify_data["data"]["flags"]["generic_flags"]
+            assert actual == target_flags, (
+                f"Expected flags={target_flags}, got {actual}"
+            )
+        finally:
+            # 5. Always restore original flags
+            restore_data = _get_result(
+                mcp_client, "iot_set_flags",
+                identifier=_REAL_DEVICE_IP, flags=original_flags,
+            )
+            assert restore_data["success"] is True
+
+            # Verify restoration
+            final_data = _get_result(
+                mcp_client, "iot_get_full_info", identifier=_REAL_DEVICE_IP,
+            )
+            assert final_data["success"] is True
+            assert final_data["data"]["flags"]["generic_flags"] == original_flags
+
+
+# ============================================================================
+# Mocked tests -- always run, use HTTP mocking, offline-safe
 # ============================================================================
 
 

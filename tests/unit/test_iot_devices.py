@@ -816,10 +816,17 @@ class TestGetOpenBKStatusEdgeCases:
     def test_get_openbk_status_minimal_html(self):
         """Should handle minimal HTML without optional fields."""
         with patch("tools.iot_devices.requests.get") as mock_get:
-            resp = MagicMock()
-            resp.status_code = 200
-            resp.text = "<html><head><title>Minimal</title></head><body></body></html>"
-            mock_get.return_value = resp
+
+            def mock_response(url, **kwargs):
+                resp = MagicMock()
+                resp.status_code = 200
+                if "index" in url:
+                    resp.text = "<html><head><title>Minimal</title></head><body></body></html>"
+                elif "Status%200" in url:
+                    resp.json.side_effect = ValueError("not json")
+                return resp
+
+            mock_get.side_effect = mock_response
             status = _get_openbk_status("192.168.1.101")
             assert status["name"] == "Minimal"
             assert status["channels"] == []
@@ -828,6 +835,45 @@ class TestGetOpenBKStatusEdgeCases:
             assert status["version"] is None
             assert status["mqtt_connected"] is False
             assert status["reboot_reason"] is None
+
+    def test_get_openbk_status_with_status_zero_enrichment(self):
+        """Should enrich status with WiFi/network data from Status 0 JSON."""
+        with patch("tools.iot_devices.requests.get") as mock_get:
+
+            def mock_response(url, **kwargs):
+                resp = MagicMock()
+                resp.status_code = 200
+                if "index" in url:
+                    resp.text = "<html><head><title>Test</title></head><body></body></html>"
+                elif "Status%200" in url:
+                    resp.json.return_value = {
+                        "StatusSTS": {
+                            "Wifi": {
+                                "SSId": "HomeWiFi",
+                                "RSSI": -50,
+                                "Signal": -50,
+                            }
+                        },
+                        "StatusNET": {
+                            "Mac": "AA:BB:CC:DD:EE:FF",
+                            "IPAddress": "192.168.1.200",
+                            "Gateway": "192.168.1.1",
+                            "Hostname": "test-device",
+                            "DNSServer1": "192.168.1.1",
+                        },
+                    }
+                return resp
+
+            mock_get.side_effect = mock_response
+            status = _get_openbk_status("192.168.1.101")
+            assert status["ssid"] == "HomeWiFi"
+            assert status["rssi"] == -50
+            assert status["signal"] == -50
+            assert status["mac"] == "AA:BB:CC:DD:EE:FF"
+            assert status["ip"] == "192.168.1.200"
+            assert status["gateway"] == "192.168.1.1"
+            assert status["hostname"] == "test-device"
+            assert status["dns"] == "192.168.1.1"
 
 
 class TestGetTasmotaStatusEdgeCases:

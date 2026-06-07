@@ -630,7 +630,7 @@ class TestDetectDeviceTypeOpenHASP:
             with patch("tools.iot_discovery.requests.get") as mock_get:
                 r1 = MagicMock()
                 r1.status_code = 200
-                r1.text = "<html>not tasmota</html>"
+                r1.text = "<html>not openbk</html>"
 
                 r2 = MagicMock()
                 r2.status_code = 200
@@ -638,9 +638,13 @@ class TestDetectDeviceTypeOpenHASP:
 
                 r3 = MagicMock()
                 r3.status_code = 200
-                r3.json.return_value = {"hasp": {"version": "0.7.0"}}
+                r3.text = "<html>not tasmota</html>"
 
-                mock_get.side_effect = [r1, r2, r3]
+                r4 = MagicMock()
+                r4.status_code = 200
+                r4.json.return_value = {"hasp": {"version": "0.7.0"}}
+
+                mock_get.side_effect = [r1, r2, r3, r4]
 
                 mock_sock = MagicMock()
                 mock_sock.connect_ex.return_value = 1
@@ -655,7 +659,7 @@ class TestDetectDeviceTypeOpenHASP:
             with patch("tools.iot_discovery.requests.get") as mock_get:
                 r1 = MagicMock()
                 r1.status_code = 200
-                r1.text = "<html>not tasmota</html>"
+                r1.text = "<html>not openbk</html>"
 
                 r2 = MagicMock()
                 r2.status_code = 200
@@ -663,9 +667,13 @@ class TestDetectDeviceTypeOpenHASP:
 
                 r3 = MagicMock()
                 r3.status_code = 200
-                r3.json.side_effect = json.JSONDecodeError("bad json", "", 0)
+                r3.text = "<html>not tasmota</html>"
 
-                mock_get.side_effect = [r1, r2, r3]
+                r4 = MagicMock()
+                r4.status_code = 200
+                r4.json.side_effect = json.JSONDecodeError("bad json", "", 0)
+
+                mock_get.side_effect = [r1, r2, r3, r4]
 
                 mock_sock = MagicMock()
                 mock_sock.connect_ex.return_value = 1
@@ -782,6 +790,124 @@ class TestProbeDeviceInfoOpenHASP:
             assert info["reachable"] is True
             assert info["type"] == "openhasp"
             assert info["name"] == "OpenHASP"
+
+
+class TestDetectDeviceTypeOpenBK:
+    """Tests for _detect_device_type probe order: OpenBK /api/info -> /index -> Tasmota /cm.
+
+    OpenBK devices can also respond to Tasmota's /cm?cmnd=Status endpoint
+    (compatibility layer), so OpenBK-specific probes MUST run first to avoid
+    misidentification.
+    """
+
+    def test_detect_openbk_via_api_info(self):
+        """Probe 1: /api/info returns 200 JSON with 'build' key -> 'openbk'."""
+        with patch("tools.iot_discovery.socket.socket") as mock_socket_cls:
+            with patch("tools.iot_discovery.requests.get") as mock_get:
+                r1 = MagicMock()
+                r1.status_code = 200
+                r1.json.return_value = {"build": "1.17.306", "version": "1.0"}
+                mock_get.side_effect = [r1]
+
+                mock_sock = MagicMock()
+                mock_sock.connect_ex.return_value = 1
+                mock_socket_cls.return_value = mock_sock
+
+                result = _detect_device_type("192.168.1.100")
+                assert result == "openbk"
+                assert mock_get.call_count == 1
+                assert "/api/info" in mock_get.call_args[0][0]
+
+    def test_detect_openbk_via_index_html(self):
+        """Probe 2: /api/info 404, /index HTML contains 'OpenBeken' -> 'openbk'."""
+        with patch("tools.iot_discovery.socket.socket") as mock_socket_cls:
+            with patch("tools.iot_discovery.requests.get") as mock_get:
+                r1 = MagicMock()
+                r1.status_code = 404
+
+                r2 = MagicMock()
+                r2.status_code = 200
+                r2.text = "<html><body>OpenBeken Device</body></html>"
+
+                mock_get.side_effect = [r1, r2]
+
+                mock_sock = MagicMock()
+                mock_sock.connect_ex.return_value = 1
+                mock_socket_cls.return_value = mock_sock
+
+                result = _detect_device_type("192.168.1.100")
+                assert result == "openbk"
+                assert mock_get.call_count == 2
+
+    def test_detect_tasmota_with_probe_order(self):
+        """Probe 3: /api/info and /index fail, /cm?cmnd=Status succeeds -> 'tasmota'."""
+        with patch("tools.iot_discovery.socket.socket") as mock_socket_cls:
+            with patch("tools.iot_discovery.requests.get") as mock_get:
+                r1 = MagicMock()
+                r1.status_code = 404
+
+                r2 = MagicMock()
+                r2.status_code = 404
+
+                r3 = MagicMock()
+                r3.status_code = 200
+                r3.text = '{"Status":{"Module":0}}'
+
+                mock_get.side_effect = [r1, r2, r3]
+
+                mock_sock = MagicMock()
+                mock_sock.connect_ex.return_value = 1
+                mock_socket_cls.return_value = mock_sock
+
+                result = _detect_device_type("192.168.1.100")
+                assert result == "tasmota"
+                assert mock_get.call_count == 3
+
+    def test_detect_unknown_device(self):
+        """All 6 probes fail -> returns None."""
+        with patch("tools.iot_discovery.socket.socket") as mock_socket_cls:
+            with patch("tools.iot_discovery.requests.get") as mock_get:
+                r1 = MagicMock()
+                r1.status_code = 404
+                r2 = MagicMock()
+                r2.status_code = 200
+                r2.text = "<html>Regular page</html>"
+                r3 = MagicMock()
+                r3.status_code = 200
+                r3.text = "<html>Not tasmota</html>"
+                r4 = MagicMock()
+                r4.status_code = 200
+                r4.text = "not JSON"
+
+                mock_get.side_effect = [r1, r2, r3, r4]
+
+                sock1 = MagicMock()
+                sock1.connect_ex.return_value = 1
+                sock2 = MagicMock()
+                sock2.connect_ex.return_value = 1
+                mock_socket_cls.side_effect = [sock1, sock2]
+
+                result = _detect_device_type("192.168.1.100")
+                assert result is None
+                assert mock_get.call_count == 4
+
+    def test_detect_openbk_probe_order(self):
+        """OpenBK /api/info runs before Tasmota /cm, winning when both could match."""
+        with patch("tools.iot_discovery.socket.socket") as mock_socket_cls:
+            with patch("tools.iot_discovery.requests.get") as mock_get:
+                r1 = MagicMock()
+                r1.status_code = 200
+                r1.json.return_value = {"build": "1.17.306"}
+                mock_get.side_effect = [r1]
+
+                mock_sock = MagicMock()
+                mock_sock.connect_ex.return_value = 1
+                mock_socket_cls.return_value = mock_sock
+
+                result = _detect_device_type("192.168.1.100")
+                assert result == "openbk"
+                assert mock_get.call_count == 1
+                assert "/api/info" in mock_get.call_args[0][0]
 
 
 class TestDiscoveryRegistrationWrappers:
