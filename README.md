@@ -123,6 +123,18 @@ All read-only operations - no device state is modified.
 | `iot_set_brightness` | [WRITE] | Set brightness level (0-100%) |
 | `iot_restart_device` | [DESTRUCTIVE] | Restart the device (temporarily disconnects) |
 
+### Device Configuration
+
+| Tool | Risk | Description |
+|------|------|-------------|
+| `iot_set_flags` | [WRITE] | Set device configuration flags as bitfield (OpenBK /cfg_generic, Tasmota SetOption) |
+| `iot_set_name` | [WRITE] | Set device short and full name (OpenBK via /cfg_name) |
+| `iot_configure_mqtt` | [WRITE] | Configure MQTT broker connection (OpenBK via /cfg_mqtt_set) |
+| `iot_set_gpio` | [WRITE] | Configure GPIO pin role and channel (OpenBK via /cfg_pins) |
+| `iot_execute_command` | [DESTRUCTIVE] | Execute raw /cm?cmnd= command with blocked-command safety |
+| `iot_start_ha_discovery` | [WRITE] | Trigger Home Assistant MQTT discovery (OpenBK via /ha_discovery) |
+| `iot_get_full_info` | [READ] | Enhanced device info: MAC, version, flags, MQTT, WiFi (both OpenBK and Tasmota) |
+
 ### Introspection
 
 | Tool | Risk | Description |
@@ -224,8 +236,10 @@ All configuration is via environment variables. See `.env.example` for a complet
 - `tools/iot_tuya.py` - Tuya device cloud + local control + diagnostics (10 tools)
 - `tools/iot_openhasp.py` - OpenHASP panel control, diagnostics, Telnet (20 tools)
 - `tools/openhasp/` - OpenHASP HTTP, Telnet, diagnostics helpers
+- `tools/iot_config.py` - Device configuration tools (7 tools)
 - `tools/iot_hikvision.py` - Hikvision doorbell tools (14 tools)
 - `tools/hikvision/` - ISAPI HTTP client, Docker socket helper
+- `tools/http_session.py` - Generic IoT device HTTP client module
 
 ## Supported Devices
 

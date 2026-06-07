@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.6.0] — 2026-06-07
+
+### Added
+- **Device Configuration Tools** (7 new tools) — set_flags, set_name, configure_mqtt, set_gpio, execute_command, start_ha_discovery, get_full_info
+- `iot_set_flags` — set device configuration flags as a 64-bit bitfield (OpenBK via /cfg_generic, Tasmota via SetOption)
+- `iot_set_name` — set device short and full name (OpenBK via /cfg_name)
+- `iot_configure_mqtt` — configure MQTT broker, port, client, group, user, password (OpenBK via /cfg_mqtt_set)
+- `iot_set_gpio` — configure GPIO pin roles and channels (OpenBK via /cfg_pins, write-guarded with warning)
+- `iot_execute_command` — execute raw /cm?cmnd= commands with blocked-command allowlist (OpenBK and Tasmota)
+- `iot_start_ha_discovery` — trigger Home Assistant MQTT discovery (OpenBK via /ha_discovery)
+- `iot_get_full_info` — enhanced device info returning MAC, firmware version, flags, MQTT, WiFi from Status 0 JSON
+- `tools/http_session.py` — generic IoT device HTTP client module with DeviceConnectionError, _DeviceHttpSession, _build_url dispatch
+- 159 new unit tests, 15 integration tests (live + mocked), 98% coverage on new code
+- `DEFAULT_HA_DISCOVERY_PREFIX` constant in tools/constants.py
+
+### Changed
+- `TOOLS_VERSION` bumped from 1.5.0 to 1.6.0
+- Registered tool count increased from 51 to 58
+
+### Documentation
+- README tool table updated with 7 new Device Configuration tools
+- AGENTS.md — no changes needed (patterns documented in existing config)
+
 ## [1.5.0] — 2026-06-06
 
 ### Added

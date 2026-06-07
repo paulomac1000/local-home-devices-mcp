@@ -42,6 +42,7 @@ from tools.constants import (
     get_tool_counts,
     setup_logging,
 )
+from tools.iot_config import register_iot_config_tools
 from tools.iot_control import register_iot_control_tools
 from tools.iot_devices import register_iot_device_tools
 from tools.iot_discovery import register_iot_discovery_tools
@@ -122,6 +123,7 @@ logging_middleware = LoggingMiddleware()
 register_iot_device_tools(mcp)
 register_iot_discovery_tools(mcp)
 register_iot_control_tools(mcp)
+register_iot_config_tools(mcp)
 register_iot_mqtt_tools(mcp)
 register_iot_meta_tools(mcp)
 register_iot_tuya_tools(mcp)

@@ -62,7 +62,9 @@ ENABLE_WRITE_OPERATIONS = os.getenv("ENABLE_WRITE_OPERATIONS", "0") == "1"
 _DEFAULT_OCTETS = START_IP.rsplit(".", 1)[0]
 DEFAULT_NETWORK_RANGE = NETWORK_RANGE or f"{_DEFAULT_OCTETS}.0/24"
 
-TOOLS_VERSION = "1.5.0"
+TOOLS_VERSION = "1.6.0"
+
+DEFAULT_HA_DISCOVERY_PREFIX = "homeassistant"
 
 # =============================================================================
 # TOOL INVOCATION COUNTERS
@@ -654,13 +656,20 @@ TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
         cost="cheap",
         determinism="eventually-consistent",
     ),
+    "iot_execute_command": _make_destructive_manifest(
+        "iot_execute_command", timeout_ms=10000, latency="slow"
+    ),
     "iot_check_device": _make_manifest("iot_check_device", timeout_ms=10000),
+    "iot_configure_mqtt": _make_write_manifest("iot_configure_mqtt", timeout_ms=10000),
     "iot_find_device_by_name": _make_manifest(
         "iot_find_device_by_name",
         timeout_ms=1000,
         latency="instant",
         cost="cheap",
         determinism="deterministic",
+    ),
+    "iot_get_full_info": _make_manifest(
+        "iot_get_full_info", timeout_ms=10000, latency="moderate", privacy="metadata"
     ),
     "iot_get_device_info": _make_manifest(
         "iot_get_device_info",
@@ -680,6 +689,9 @@ TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
         timeout_ms=10000,
         latency="slow",
     ),
+    "iot_set_flags": _make_write_manifest("iot_set_flags", timeout_ms=10000),
+    "iot_set_gpio": _make_write_manifest("iot_set_gpio", timeout_ms=10000),
+    "iot_set_name": _make_write_manifest("iot_set_name", timeout_ms=10000),
     "iot_mqtt_publish": _make_write_manifest("iot_mqtt_publish", timeout_ms=5000),
     "iot_mqtt_get_state": _make_manifest("iot_mqtt_get_state", timeout_ms=10000),
     "iot_mqtt_build_command_topic": _make_manifest(
@@ -690,6 +702,7 @@ TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
         determinism="deterministic",
         side_effects="none",
     ),
+    "iot_start_ha_discovery": _make_write_manifest("iot_start_ha_discovery", timeout_ms=10000),
     "describe_iot_capabilities": _make_manifest(
         "describe_iot_capabilities",
         timeout_ms=100,
