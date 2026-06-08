@@ -178,20 +178,24 @@ All read-only operations - no device state is modified.
 
 | Tool | Risk | Description |
 |------|------|-------------|
-| `hikvision_container_status` | [READ] | Get Docker container running status and health |
-| `hikvision_container_logs` | [READ] | Fetch recent container logs (VMD events, calls, errors) |
+| `hikvision_container_status` | [READ] | [CONTAINER] Get Docker container running status and health |
+| `hikvision_container_logs` | [READ] | [CONTAINER] Fetch recent container logs (VMD events, calls, errors) |
 | `hikvision_device_info` | [READ] | Fetch doorbell device metadata via ISAPI |
-| `hikvision_check_vmd` | [READ] | Check VMD motion events -- ISAPI health canary |
+| `hikvision_check_vmd` | [READ] | [CONTAINER] Check VMD motion events -- ISAPI health canary |
 | `hikvision_take_snapshot` | [READ] | Capture JPEG snapshot from doorbell camera |
 | `hikvision_get_motion_config` | [READ] | Fetch VMD motion detection configuration |
 | `hikvision_get_event_config` | [READ] | Fetch ISAPI event trigger configuration |
 | `hikvision_get_alarm_server` | [READ] | Fetch HTTP notification host (alarm server) config |
-| `hikvision_isapi_health` | [READ] | Composite health check (container + VMD + call events) |
-| `hikvision_pipeline_diagnose` | [READ] | Full pipeline trace (container to ISAPI to events to MQTT to snapshots) |
+| `hikvision_isapi_health` | [READ] | [CONTAINER] Composite health check (container + VMD + call events) |
+| `hikvision_pipeline_diagnose` | [READ] | [CONTAINER] Full pipeline trace (container to ISAPI to events to MQTT to snapshots) |
 | `hikvision_open_gate` | [WRITE] | Trigger electric lock relay to open gate |
 | `hikvision_set_motion_detection` | [WRITE] | Enable/disable VMD or adjust sensitivity (write-guarded) |
 | `hikvision_snapshot_to_file` | [WRITE] | Capture JPEG and save directly to disk (write-guarded) |
-| `hikvision_restart_container` | [DESTRUCTIVE] | Restart the Docker container |
+| `hikvision_restart_container` | [DESTRUCTIVE] | [CONTAINER] Restart the Docker container |
+
+> **Note**: Tools marked `[CONTAINER]` require the `hikvision-doorbell` Docker container
+> and access to `/var/run/docker.sock`. ISAPI-only tools work with any Hikvision doorbell
+> accessible via HTTP Digest Auth.
 
 ## Configuration
 

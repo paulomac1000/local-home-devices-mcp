@@ -11,6 +11,7 @@ import calendar
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import threading
@@ -496,6 +497,15 @@ def _iot_discover_devices(network_range: str | None = None, timeout_seconds: int
     """
     if network_range is None:
         network_range = DEFAULT_NETWORK_RANGE
+    # Check nmap availability before attempting scan
+    if not shutil.which("nmap"):
+        return _error_response_extended(
+            code="DEPENDENCY_MISSING",
+            message="nmap is not installed. Install it with: apt-get install nmap",
+            suggestion="Install nmap via your package manager (apt, dnf, brew). "
+            "The Docker image includes it automatically.",
+        )
+
     try:
         alive_ips = _scan_network(network_range, timeout_seconds)
 

@@ -14,6 +14,7 @@ Architecture:
 import inspect
 import json
 import os
+import shutil
 import sys
 import threading
 import time
@@ -27,6 +28,7 @@ from tools.constants import (
     ALLOW_PUBLIC_BIND,
     BIND_HOST,
     DEFAULT_NETWORK_RANGE,
+    DOCKER_SOCKET,
     END_IP,
     HEALTH_CHECK_PORT,
     MCP_ALLOWED_ORIGINS,
@@ -653,6 +655,19 @@ def main() -> None:
     logger.info("Device Cache: /app/data/discovered_devices.json")
     logger.info("Registered tools: %d", tool_count)
     logger.info("-" * 50)
+
+    # Check optional dependencies
+    if not os.path.exists(DOCKER_SOCKET):
+        logger.warning(
+            "Docker socket %s not found -- 6 Hikvision Docker tools "
+            "(container_status, container_logs, check_vmd, restart_container, "
+            "isapi_health, pipeline_diagnose) will return errors.",
+            DOCKER_SOCKET,
+        )
+    if not shutil.which("nmap"):
+        logger.warning(
+            "nmap not found -- iot_discover_devices will fail. Install with: apt-get install nmap"
+        )
 
     # 2. Start REST API in a separate thread (port 9102)
     rest_thread = threading.Thread(target=run_rest_api, daemon=True, name="RestAPI")

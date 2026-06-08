@@ -256,6 +256,35 @@ pre-commit run --all-files
 | pytest unit | pre-commit | Run unit tests | ci.yml test job |
 | tool count validate | pre-commit | Verify MCP tool count | ci.yml docker-smoke |
 
+## Conditional Tool Registration
+
+Some tools depend on optional infrastructure (Docker socket, system binaries like nmap, Python libraries like tinytuya). These tools should fail gracefully rather than crash the server.
+
+### Pattern: `_X_available()` check -> `DEPENDENCY_MISSING` error
+
+Follow the existing Canonical Template 1 pattern:
+
+1. **Lazy import check at module level** -- `_import_tinytuya()` in `tools/iot_tuya.py` returns `True` only if the library is importable.
+2. **Tool checks at invocation time** -- if `_import_tinytuya()` returns `False`, return `_error_response_extended(code="DEPENDENCY_MISSING", ...)`.
+3. **Docker tools check socket existence** -- `_docker_available()` in `tools/hikvision/docker_client.py` checks if `/var/run/docker.sock` exists.
+4. **System binaries** -- `shutil.which("nmap")` in `tools/iot_discovery.py` returns the path or `None`.
+
+### Examples in this codebase
+
+| Dependency | Check Function | Tool Type |
+|------------|---------------|-----------|
+| tinytuya library | `_import_tinytuya()` | Tuya cloud/local |
+| paho-mqtt library | `_get_mqtt_client()` | MQTT publish/state |
+| Docker socket | `_docker_available()` | Hikvision container tools |
+| nmap binary | `shutil.which("nmap")` | Device discovery |
+
+### Tool Registration Rules
+
+- **ISAPI/HTTP tools** (direct device communication) -- always registered, no infrastructure dependency.
+- **Docker tools** (container status, logs, restart) -- registered only when `_docker_available()`.
+- **MQTT tools** -- always registered, return `DEPENDENCY_MISSING` at invocation time.
+- **Discovery** -- always registered, check nmap before scanning.
+
 ## Common Pitfalls
 
 ### Hardcoded IPs and Ports

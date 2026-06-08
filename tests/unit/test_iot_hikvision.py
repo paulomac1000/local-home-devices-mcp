@@ -651,12 +651,50 @@ class TestHikvisionToolRegistration:
     def mcp(self, mock_mcp):
         from tools.iot_hikvision import register_hikvision_tools
 
-        register_hikvision_tools(mock_mcp)
+        with patch("tools.iot_hikvision._docker_available", return_value=True):
+            register_hikvision_tools(mock_mcp)
         return mock_mcp
 
     def test_all_fourteen_tools_registered(self, mcp):
         hik_tools = [n for n in mcp._tools if n.startswith("hikvision_")]
         assert len(hik_tools) == 14
+
+    def test_eight_isapi_tools_when_docker_unavailable(self):
+        from tools.iot_hikvision import register_hikvision_tools
+
+        mcp = MagicMock()
+        mcp._tools = {}
+
+        def tool_decorator(*args, **kwargs):
+            def wrapper(func):
+                tool_name = kwargs.get("name", func.__name__)
+                mcp._tools[tool_name] = func
+                return func
+
+            if len(args) == 1 and callable(args[0]) and not kwargs:
+                mcp._tools[args[0].__name__] = args[0]
+                return args[0]
+
+            return wrapper
+
+        mcp.tool = tool_decorator
+        mcp.get_tool = lambda name: mcp._tools.get(name)
+
+        with patch("tools.iot_hikvision._docker_available", return_value=False):
+            register_hikvision_tools(mcp)
+
+        hik_tools = [n for n in mcp._tools if n.startswith("hikvision_")]
+        assert len(hik_tools) == 8
+        # Docker tools must NOT be registered
+        assert "hikvision_container_status" not in mcp._tools
+        assert "hikvision_container_logs" not in mcp._tools
+        assert "hikvision_check_vmd" not in mcp._tools
+        assert "hikvision_restart_container" not in mcp._tools
+        assert "hikvision_isapi_health" not in mcp._tools
+        assert "hikvision_pipeline_diagnose" not in mcp._tools
+        # ISAPI tools must be registered
+        assert "hikvision_take_snapshot" in mcp._tools
+        assert "hikvision_device_info" in mcp._tools
 
     def test_container_status_tool(self, mcp):
         with patch(
