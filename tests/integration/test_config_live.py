@@ -1,22 +1,22 @@
 """Live device integration tests for config tools.
 
-Tests run against real OpenBK (.115) and Tasmota (.109) devices
+Tests run against real OpenBK and Tasmota devices
 when they are reachable. All tests are read-only — no state changes.
 """
 
 import json
+import os
 import re
 import socket
 
 import pytest
 
-OPENBK_IP = "192.168.0.115"
-TASMOTA_IP = "192.168.0.109"
+OPENBK_IP = os.getenv("TEST_OPENBK_DEVICE_IP", "192.0.2.115")
+TASMOTA_IP = os.getenv("TEST_TASMOTA_DEVICE_IP", "192.0.2.109")
 
 # Both devices are detected as "tasmota" by _detect_device_type()
 # due to the /cm compatibility layer on OpenBK. The actual device
 # type is derived from version strings in the Status 0 response.
-# Known: .115 = OpenBK7231N v1.17.306, .109 = Tasmota 12.5.0.
 
 MAC_RE = re.compile(r"^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$")
 
@@ -54,7 +54,7 @@ def _get_data(mcp_client, tool_name, **kwargs):
 
 
 class TestOpenBKLive:
-    """Read-only tests against the live OpenBK device at 192.168.0.115."""
+    """Read-only tests against the live OpenBK device at OPENBK_IP."""
 
     @openbk_skip
     def test_get_full_info_returns_device_info(self, mcp_client):
@@ -120,7 +120,7 @@ class TestOpenBKLive:
 
 
 class TestTasmotaLive:
-    """Read-only tests against the live Tasmota device at 192.168.0.109."""
+    """Read-only tests against the live Tasmota device at TASMOTA_IP."""
 
     @tasmota_skip
     def test_get_full_info_returns_device_info(self, mcp_client):

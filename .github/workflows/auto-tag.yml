@@ -32,12 +32,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Extract version from pyproject.toml
+      - name: Determine release version
         id: version
         run: |
-          VERSION=$(grep 'version = ' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Found version: $VERSION"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "version=${{ github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+          else
+            VERSION=$(grep 'version = ' pyproject.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+            echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Using version: $(grep version= $GITHUB_OUTPUT | cut -d= -f2)"
 
       - name: Create and push tag
         env:

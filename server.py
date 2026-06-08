@@ -206,7 +206,7 @@ def _validate_origin(request: Any) -> bool:
     """
     origin = request.headers.get("origin", "")
     if not origin:
-        return False
+        return True  # Non-browser request — DNS rebinding not applicable
     from urllib.parse import urlparse
 
     parsed = urlparse(origin)

@@ -158,7 +158,12 @@ def _mqtt_get_state(topic_prefix: str, timeout_seconds: int = 10) -> str:
                 if info.get("success"):
                     dev_info = info.get("data", info).get("info", info.get("data", {}))
                     channels = dev_info.get("channels", 1)
-                    if channels == 0:
+                    has_no_channels = (
+                        channels == 0
+                        or (isinstance(channels, list) and len(channels) == 0)
+                        or (isinstance(channels, dict) and len(channels) == 0)
+                    )
+                    if has_no_channels:
                         return _success_response(
                             {
                                 "state": "unknown",

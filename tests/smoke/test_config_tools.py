@@ -1,5 +1,7 @@
 """Smoke tests for IoT configuration tools via REST API."""
 
+import os
+
 import pytest
 import requests
 
@@ -38,7 +40,7 @@ SPECIFIC_CONFIG_TOOLS: tuple[str, ...] = (
 )
 
 # Safe test device — read-only Status 0 commands are harmless
-TEST_DEVICE_IP = "192.168.0.115"
+TEST_DEVICE_IP = os.getenv("TEST_CONFIG_DEVICE_IP", "192.0.2.115")
 
 
 # ---------------------------------------------------------------------------
@@ -203,7 +205,7 @@ class TestReadOnlyToolShapes:
 
     def test_iot_find_device_by_name_shape(self) -> None:
         """iot_find_device_by_name with a test name returns valid JSON."""
-        resp = _api_post("iot_find_device_by_name", {"name": "Light_Bedroom"})
+        resp = _api_post("iot_find_device_by_name", {"name": "OpenBK_Test"})
         data = resp.json()
         assert "success" in data, "Response must contain 'success' key"
 

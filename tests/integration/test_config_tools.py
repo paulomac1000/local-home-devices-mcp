@@ -1,7 +1,7 @@
 """Integration tests for IoT configuration tools.
 
 These tests work in two modes:
-1. Live mode: When 192.168.0.115 (real OpenBK device) is reachable — read-only tests
+1. Live mode: When the OpenBK device is reachable — read-only tests
 2. Replay mode: When device unreachable — tests use HTTP mocking
 
 All live tests are read-only on the real device. Write-tool error-path
@@ -9,6 +9,7 @@ tests verify name resolution and validation, never reaching real hardware.
 """
 
 import json
+import os
 import re
 import socket
 from unittest.mock import MagicMock, patch
@@ -17,11 +18,11 @@ import pytest
 
 # ---------------------------------------------------------------------------
 
-_REAL_DEVICE_IP = "192.168.0.115"
+_REAL_DEVICE_IP = os.getenv("TEST_OPENBK_DEVICE_IP", "192.0.2.115")
 
 
 def _device_reachable():
-    """Check if the real OpenBK device at 192.168.0.115 is reachable.
+    """Check if the real OpenBK device at _REAL_DEVICE_IP is reachable.
 
     Returns:
         True if the device accepts a TCP connection on port 80.
@@ -46,7 +47,7 @@ def _get_result(mcp_client, tool_name, **kwargs):
 
 
 # ============================================================================
-# Live tests — run only when the real OpenBK device at 192.168.0.115 is online
+# Live tests — run only when the real OpenBK device (at _REAL_DEVICE_IP) is online
 # ============================================================================
 
 

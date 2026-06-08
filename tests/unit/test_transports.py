@@ -6,6 +6,7 @@ middleware integration, and route availability via Starlette TestClient.
 Zero I/O -- all external dependencies are mocked.
 """
 
+from contextlib import contextmanager
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -111,13 +112,13 @@ class TestOriginValidation:
         """Origin https://localhost should be allowed."""
         assert _validate_origin(self._make_request("https://localhost")) is True
 
-    def test_empty_origin_blocked(self):
-        """Empty Origin should return False."""
-        assert _validate_origin(self._make_request("")) is False
+    def test_empty_origin_allowed(self):
+        """Empty Origin allowed (non-browser request)."""
+        assert _validate_origin(self._make_request("")) is True
 
-    def test_none_origin_blocked(self):
-        """None Origin returns False."""
-        assert _validate_origin(self._make_request(None)) is False
+    def test_none_origin_allowed(self):
+        """None Origin allowed (non-browser request)."""
+        assert _validate_origin(self._make_request(None)) is True
 
     def test_external_origin_blocked(self):
         """External origin (evil.com) should be blocked."""
@@ -350,172 +351,154 @@ class TestTransportRoutes:
     """Tests for /mcp routes via Starlette TestClient."""
 
     def _create_app(self):
-        """Create rest app with mocked tool deps (no real FastMCP)."""
-        with (
-            patch("server.get_all_tools", return_value={}),
-            patch("server.get_tool_count", return_value=0),
-            patch("server.get_tool_counts", return_value={}),
-        ):
-            return create_rest_app()
+        """Create app with ALL patches active.
+
+        Returns a context manager that keeps patches alive for the full
+        request lifecycle. Use: with self._create_app() as (app, client): ...
+        """
+
+        @contextmanager
+        def _patched_app():
+            with (
+                patch("server.get_all_tools", return_value={}),
+                patch("server.get_tool_count", return_value=0),
+                patch("server.get_tool_counts", return_value={}),
+            ):
+                from starlette.testclient import TestClient
+
+                app = create_rest_app()
+                client = TestClient(app)
+                yield app, client
+
+        return _patched_app()
 
     def test_mcp_get_returns_200(self):
         """GET /mcp returns SSE placeholder."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        resp = client.get("/mcp")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["jsonrpc"] == "2.0"
-        assert data["result"]["stream"] == "mcp-events"
+        with self._create_app() as (app, client):
+            resp = client.get("/mcp")
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["jsonrpc"] == "2.0"
+            assert data["result"]["stream"] == "mcp-events"
 
     def test_mcp_post_tools_list_returns_200(self):
         """POST /mcp with tools/list returns tool list."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        body = {"jsonrpc": "2.0", "method": "tools/list", "id": 1}
-        resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["jsonrpc"] == "2.0"
-        assert "tools" in data["result"]
+        with self._create_app() as (app, client):
+            body = {"jsonrpc": "2.0", "method": "tools/list", "id": 1}
+            resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
+            assert resp.status_code == 200
+            data = resp.json()
+            assert data["jsonrpc"] == "2.0"
+            assert "tools" in data["result"]
 
     def test_mcp_post_list_categories_returns_200(self):
         """POST /mcp with tools/list_categories returns categories."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        body = {"jsonrpc": "2.0", "method": "tools/list_categories", "id": 1}
-        resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
-        assert resp.status_code == 200
-        assert "categories" in resp.json()["result"]
+        with self._create_app() as (app, client):
+            body = {"jsonrpc": "2.0", "method": "tools/list_categories", "id": 1}
+            resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
+            assert resp.status_code == 200
+            assert "categories" in resp.json()["result"]
 
     def test_mcp_get_schema_unknown_tool_returns_404(self):
         """tools/get_schema for unknown tool returns -32602."""
-        from starlette.testclient import TestClient
-
-        # Patch get_tool to return None so the "tool not found" branch fires.
-        # We cannot rely on _create_app's patches because they exit scope
-        # before the route handler runs.
         with patch("server.get_tool", return_value=None):
-            client = TestClient(self._create_app())
-            body = {
-                "jsonrpc": "2.0",
-                "method": "tools/get_schema",
-                "params": {"name": "nonexistent_tool"},
-                "id": 1,
-            }
-            resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
-        assert resp.status_code == 404
-        assert resp.json()["error"]["code"] == -32602
+            with self._create_app() as (app, client):
+                body = {
+                    "jsonrpc": "2.0",
+                    "method": "tools/get_schema",
+                    "params": {"name": "nonexistent_tool"},
+                    "id": 1,
+                }
+                resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
+                assert resp.status_code == 404
+                assert resp.json()["error"]["code"] == -32602
 
     def test_mcp_post_missing_method_returns_404(self):
         """POST /mcp without method returns -32601."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        body = {"jsonrpc": "2.0", "id": 1}
-        resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
-        assert resp.status_code == 404
-        assert resp.json()["error"]["code"] == -32601
+        with self._create_app() as (app, client):
+            body = {"jsonrpc": "2.0", "id": 1}
+            resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
+            assert resp.status_code == 404
+            assert resp.json()["error"]["code"] == -32601
 
     def test_mcp_post_unknown_method_returns_404(self):
         """POST /mcp with unknown method returns -32601."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        body = {"jsonrpc": "2.0", "method": "bogus_method", "id": 1}
-        resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
-        assert resp.status_code == 404
-        assert resp.json()["error"]["code"] == -32601
+        with self._create_app() as (app, client):
+            body = {"jsonrpc": "2.0", "method": "bogus_method", "id": 1}
+            resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
+            assert resp.status_code == 404
+            assert resp.json()["error"]["code"] == -32601
 
     def test_mcp_post_invalid_json_returns_400(self):
         """POST /mcp with invalid JSON returns 400."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        resp = client.post(
-            "/mcp",
-            content=b"not valid json",
-            headers={
-                "origin": "http://localhost:9102",
-                "content-type": "application/json",
-            },
-        )
-        assert resp.status_code == 400
-        assert "error" in resp.json()
+        with self._create_app() as (app, client):
+            resp = client.post(
+                "/mcp",
+                content=b"not valid json",
+                headers={
+                    "origin": "http://localhost:9102",
+                    "content-type": "application/json",
+                },
+            )
+            assert resp.status_code == 400
+            assert "error" in resp.json()
 
     def test_mcp_post_origin_not_allowed_returns_403(self):
         """POST /mcp with external Origin blocked (403)."""
-        from starlette.testclient import TestClient
+        with self._create_app() as (app, client):
+            body = {"jsonrpc": "2.0", "method": "tools/list", "id": 1}
+            resp = client.post("/mcp", json=body, headers={"origin": "https://evil.com"})
+            assert resp.status_code == 403
 
-        client = TestClient(self._create_app())
-        body = {"jsonrpc": "2.0", "method": "tools/list", "id": 1}
-        resp = client.post("/mcp", json=body, headers={"origin": "https://evil.com"})
-        assert resp.status_code == 403
-
-    def test_mcp_post_no_origin_returns_403(self):
-        """POST /mcp without Origin header blocked (403)."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        body = {"jsonrpc": "2.0", "method": "tools/list", "id": 1}
-        resp = client.post("/mcp", json=body)
-        assert resp.status_code == 403
+    def test_mcp_post_no_origin_returns_200(self):
+        """POST /mcp without Origin header allowed (non-browser client)."""
+        with self._create_app() as (app, client):
+            body = {"jsonrpc": "2.0", "method": "tools/list", "id": 1}
+            resp = client.post("/mcp", json=body)
+            assert resp.status_code == 200
 
     def test_mcp_delete_returns_200(self):
         """DELETE /mcp returns success."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        resp = client.delete("/mcp", headers={"Origin": "http://localhost:9102"})
-        assert resp.status_code == 200
-        assert resp.json()["success"] is True
+        with self._create_app() as (app, client):
+            resp = client.delete("/mcp", headers={"Origin": "http://localhost:9102"})
+            assert resp.status_code == 200
+            assert resp.json()["success"] is True
 
     def test_mcp_delete_with_session_terminates(self):
         """DELETE /mcp with session ID terminates it."""
-        from starlette.testclient import TestClient
-
         session_id = _create_session()
         assert _validate_session(session_id) is True
 
-        client = TestClient(self._create_app())
-        resp = client.delete(
-            "/mcp", headers={"mcp-session-id": session_id, "Origin": "http://localhost:9102"}
-        )
-        assert resp.status_code == 200
+        with self._create_app() as (app, client):
+            resp = client.delete(
+                "/mcp", headers={"mcp-session-id": session_id, "Origin": "http://localhost:9102"}
+            )
+            assert resp.status_code == 200
         assert _validate_session(session_id) is False
 
     def test_mcp_delete_with_case_insensitive_header(self):
         """DELETE /mcp with Mcp-Session-Id (capitalized)."""
-        from starlette.testclient import TestClient
-
         session_id = _create_session()
-        client = TestClient(self._create_app())
-        resp = client.delete(
-            "/mcp", headers={"Mcp-Session-Id": session_id, "Origin": "http://localhost:9102"}
-        )
-        assert resp.status_code == 200
+        with self._create_app() as (app, client):
+            resp = client.delete(
+                "/mcp", headers={"Mcp-Session-Id": session_id, "Origin": "http://localhost:9102"}
+            )
+            assert resp.status_code == 200
         assert _validate_session(session_id) is False
 
     def test_health_route_returns_200(self):
         """GET /health returns healthy."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        resp = client.get("/health")
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "healthy"
+        with self._create_app() as (app, client):
+            resp = client.get("/health")
+            assert resp.status_code == 200
+            assert resp.json()["status"] == "healthy"
 
     def test_api_health_route_returns_200(self):
         """GET /api/health returns healthy."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        resp = client.get("/api/health")
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "healthy"
+        with self._create_app() as (app, client):
+            resp = client.get("/api/health")
+            assert resp.status_code == 200
+            assert resp.json()["status"] == "healthy"
 
     def test_api_tools_route_returns_200(self):
         """GET /api/tools returns tool list."""
@@ -538,37 +521,35 @@ class TestTransportRoutes:
 
     def test_mcp_post_tools_call_missing_name_returns_400(self):
         """tools/call with empty name returns -32602."""
-        from starlette.testclient import TestClient
-
-        client = TestClient(self._create_app())
-        body = {
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "params": {"name": "", "arguments": {}},
-            "id": 1,
-        }
-        resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
-        assert resp.status_code == 400
-        assert resp.json()["error"]["code"] == -32602
+        with self._create_app() as (app, client):
+            body = {
+                "jsonrpc": "2.0",
+                "method": "tools/call",
+                "params": {"name": "", "arguments": {}},
+                "id": 1,
+            }
+            resp = client.post("/mcp", json=body, headers={"origin": "http://localhost:9102"})
+            assert resp.status_code == 400
+            assert resp.json()["error"]["code"] == -32602
 
     def test_mcp_route_count(self):
         """The app should have exactly 3 /mcp routes (GET, POST, DELETE)."""
-        app = self._create_app()
-        mcp_routes = [r for r in app.routes if r.path == "/mcp"]
-        assert len(mcp_routes) == 3
+        with self._create_app() as (app, _):
+            mcp_routes = [r for r in app.routes if r.path == "/mcp"]
+            assert len(mcp_routes) == 3
 
     def test_all_routes_present(self):
         """All expected routes should be registered."""
-        app = self._create_app()
-        paths = {(r.path, tuple(sorted(r.methods))) for r in app.routes}
-        expected = {
-            ("/health", ("GET", "HEAD")),
-            ("/api/health", ("GET", "HEAD")),
-            ("/api/tools", ("GET", "HEAD")),
-            ("/api/tools/{tool_name}", ("POST",)),
-            ("/api/tools/{tool_name}/manifest", ("GET", "HEAD")),
-            ("/mcp", ("DELETE",)),
-            ("/mcp", ("GET", "HEAD")),
-            ("/mcp", ("POST",)),
-        }
-        assert expected.issubset(paths), f"Missing routes: {expected - paths}"
+        with self._create_app() as (app, _):
+            paths = {(r.path, tuple(sorted(r.methods))) for r in app.routes}
+            expected = {
+                ("/health", ("GET", "HEAD")),
+                ("/api/health", ("GET", "HEAD")),
+                ("/api/tools", ("GET", "HEAD")),
+                ("/api/tools/{tool_name}", ("POST",)),
+                ("/api/tools/{tool_name}/manifest", ("GET", "HEAD")),
+                ("/mcp", ("DELETE",)),
+                ("/mcp", ("GET", "HEAD")),
+                ("/mcp", ("POST",)),
+            }
+            assert expected.issubset(paths), f"Missing routes: {expected - paths}"
