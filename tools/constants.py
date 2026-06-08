@@ -40,6 +40,14 @@ HIKVISION_DOORBELL_USER = os.getenv("HIKVISION_DOORBELL_USER", "")
 HIKVISION_DOORBELL_PASSWORD = os.getenv("HIKVISION_DOORBELL_PASSWORD", "")
 HIKVISION_CONTAINER_NAME = os.getenv("HIKVISION_CONTAINER_NAME", "hikvision-doorbell")
 DOCKER_SOCKET = os.getenv("DOCKER_SOCKET", "/var/run/docker.sock")
+DOCKER_TOOL_NAMES: list[str] = [
+    "hikvision_container_status",
+    "hikvision_container_logs",
+    "hikvision_check_vmd",
+    "hikvision_restart_container",
+    "hikvision_isapi_health",
+    "hikvision_pipeline_diagnose",
+]
 CAMERA_GATE_SNAPSHOTS_DIR = os.getenv(
     "CAMERA_GATE_SNAPSHOTS_DIR",
     "/config/www/archive/camera_gate",

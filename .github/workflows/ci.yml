@@ -122,12 +122,16 @@ jobs:
       - name: Smoke test - tool count
         run: |
           docker run --rm local-home-devices-mcp:test python3 -c "
-          from tools.constants import TOOL_MANIFESTS
+          from tools.constants import TOOL_MANIFESTS, DOCKER_TOOL_NAMES
           from server import get_tool_count
-          expected = len(TOOL_MANIFESTS)
+          full_count = len(TOOL_MANIFESTS)
           tc = get_tool_count()
-          assert tc == expected, f'Expected {expected} tools, got {tc}'
-          print(f'Tool count OK: {tc} / {expected}')
+          # Docker tools are conditionally registered; in CI container Docker socket is absent
+          docker_count = len([name for name in TOOL_MANIFESTS if name in DOCKER_TOOL_NAMES])
+          min_expected = full_count - docker_count
+          msg = f'Tool count: {tc} (range [{min_expected}, {full_count}], full={full_count}, docker_missing={full_count - docker_count})'
+          assert min_expected <= tc <= full_count, f'{msg} -- OUT OF RANGE'
+          print(msg)
           "
 
       - name: Smoke test - REST API health + tools
