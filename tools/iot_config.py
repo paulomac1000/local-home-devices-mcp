@@ -739,20 +739,20 @@ def _get_full_info(identifier: str, timeout_seconds: int = 10) -> str:
         if isinstance(set_option, list) and len(set_option) >= 2:
             try:
                 raw_0 = int(set_option[0], 16) if isinstance(set_option[0], str) else set_option[0]
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 raw_0 = 0
             try:
                 raw_1_hex = set_option[1] if isinstance(set_option[1], str) else str(set_option[1])
                 # SetOption[1] may contain >32 bits on some OBK versions — mask to uint32
                 raw_1 = int(raw_1_hex[-8:] if len(raw_1_hex) > 8 else raw_1_hex, 16)
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 raw_1 = 0
             flags_data["generic_flags"] = raw_0
             flags_data["generic_flags_2"] = raw_1
         elif isinstance(set_option, list) and len(set_option) >= 1:
             try:
                 raw_0 = int(set_option[0], 16) if isinstance(set_option[0], str) else set_option[0]
-            except ValueError, TypeError:
+            except (ValueError, TypeError):
                 raw_0 = 0
             flags_data["generic_flags"] = raw_0
     elif dev_type == "tasmota":
