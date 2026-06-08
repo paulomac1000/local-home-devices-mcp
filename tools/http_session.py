@@ -7,6 +7,7 @@ OpenBK, Tasmota, and other IoT device types. Used by all Wave 2
 configuration tools (set_flags, set_name, configure_mqtt, etc.).
 """
 
+import json
 import urllib.parse
 from typing import Any, NoReturn
 
@@ -104,6 +105,8 @@ class _DeviceHttpSession:
             resp = self._session.get(url, params=params, timeout=t)
             resp.raise_for_status()
             return resp.json()
+        except (ValueError, json.JSONDecodeError) as exc:
+            raise DeviceConnectionError(f"Invalid JSON response from device: {exc}") from exc
         except requests.exceptions.Timeout as exc:
             raise DeviceConnectionError("Connection timed out") from exc
         except requests.exceptions.ConnectionError as exc:
