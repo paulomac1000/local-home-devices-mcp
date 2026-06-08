@@ -713,6 +713,10 @@ TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
             "via /cfg_generic or /cm?cmnd=SetOption"
         ),
     },
+    "iot_set_friendly_name": {
+        **_make_write_manifest("iot_set_friendly_name", timeout_ms=10000),
+        "description": "Set device friendly name (FriendlyName1) on Tasmota devices",
+    },
     "iot_set_gpio": {
         **_make_write_manifest("iot_set_gpio", timeout_ms=10000),
         "description": "Configure GPIO pin role and channel on device via /cfg_pins",

@@ -36,6 +36,7 @@ __all__ = [
     "_start_ha_discovery",
     "_get_full_info",
     "_set_startup_command",
+    "_set_friendly_name",
 ]
 
 # --------------------------------------------------------------------------- #
@@ -597,6 +598,54 @@ def _set_startup_command(identifier: str, command: str, timeout_seconds: int = 1
         return _error_response_extended(code="DEVICE_ERROR", message=msg)
 
 
+def _set_friendly_name(identifier: str, friendly_name: str, timeout_seconds: int = 10) -> str:
+    """Set device friendly name (FriendlyName1) -- Tasmota-specific.
+
+    Args:
+        identifier: IP address or device name.
+        friendly_name: New friendly name for the device.
+        timeout_seconds: Request timeout in seconds.
+
+    Returns:
+        JSON string with result.
+    """
+    from tools.iot_discovery import _detect_device_type
+
+    try:
+        identifier = validate_required_string(identifier, "identifier")
+        friendly_name = validate_required_string(friendly_name, "friendly_name")
+    except ValidationError as exc:
+        return _error_response_extended(code="INVALID_PARAM", message=str(exc))
+
+    ip_address = _resolve_or_fail(identifier)
+    if not ip_address:
+        return _build_unresolved_response(identifier)
+
+    device_type = _detect_device_type(ip_address, timeout_seconds)
+    if not device_type:
+        return _error_response_extended(
+            code="DEVICE_NOT_FOUND",
+            message=f"No IoT device found at {ip_address}",
+        )
+
+    try:
+        url_path, dev_type = _build_url(
+            device_type, "set_friendly_name", friendly_name=friendly_name
+        )
+        session = _DeviceHttpSession(f"http://{ip_address}", default_timeout=timeout_seconds)
+        session.get_form(url_path)
+        return _success_response({
+            "device_type": dev_type,
+            "friendly_name": friendly_name,
+            "ip": ip_address,
+        })
+    except DeviceConnectionError as exc:
+        msg = str(exc)
+        if msg.startswith("[UNSUPPORTED_TYPE]"):
+            return _error_response_extended(code="UNSUPPORTED_TYPE", message=msg)
+        return _error_response_extended(code="DEVICE_ERROR", message=msg)
+
+
 def _get_full_info(identifier: str, timeout_seconds: int = 10) -> str:
     """Get comprehensive device information including MAC, version, flags, MQTT, WiFi.
 
@@ -1049,5 +1098,37 @@ def register_iot_config_tools(mcp: Any) -> None:
             start_tool_context()
             increment_tool_count("iot_get_full_info")
             return _get_full_info(identifier, timeout_seconds)
+        except Exception as exc:
+            return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
+
+    @mcp.tool()
+    @inject_tool_risk_prefix
+    def iot_set_friendly_name(
+        identifier: str, friendly_name: str, timeout_seconds: int = 10
+    ) -> str:
+        """Set device friendly name (FriendlyName1) on Tasmota devices.
+
+        Args:
+            identifier: IP address or device name.
+            friendly_name: New friendly name for the device.
+            timeout_seconds: Request timeout in seconds (default 10).
+
+        Returns:
+            JSON with result.
+
+        @since v1.6.0
+        """
+        try:
+            start_tool_context()
+            check_write_enabled()
+            increment_tool_count("iot_set_friendly_name")
+            return _set_friendly_name(identifier, friendly_name, timeout_seconds)
+        except ValidationError as exc:
+            return _error_response_extended(
+                code="WRITE_DISABLED",
+                message=str(exc),
+                retryable=False,
+                suggestion="Ask the server operator to set ENABLE_WRITE_OPERATIONS=1.",
+            )
         except Exception as exc:
             return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))

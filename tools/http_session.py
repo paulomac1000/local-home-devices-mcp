@@ -203,8 +203,10 @@ def _build_url(device_type: str, endpoint_name: str, **params: Any) -> tuple[str
             cmd = str(params.get("command", ""))
             encoded = urllib.parse.quote(cmd, safe="")
             return (f"/startup_command?startup_cmd=1&data={encoded}", "openbk")
+        if device_type == "tasmota":
+            return _build_tasmota_url(endpoint_name, **params)
         raise DeviceConnectionError(
-            "[UNSUPPORTED_TYPE] set_startup_command is only supported on OpenBK"
+            "[UNSUPPORTED_TYPE] set_startup_command is only supported on OpenBK and Tasmota"
         )
 
     # --- Dispatch by device type ---
@@ -296,38 +298,66 @@ def _build_openbk_url(endpoint_name: str, **params: Any) -> tuple[str, str]:
 def _build_tasmota_url(endpoint_name: str, **params: Any) -> tuple[str, str]:
     """Build Tasmota-specific URL for a named endpoint.
 
-    Most configuration endpoints are unsupported on Tasmota via simple
-    HTTP GET -- Tasmota either auto-discovers, requires WebUI interaction,
-    or needs multiple sequential commands that cannot be expressed as a
-    single URL.  The caller should catch ``DeviceConnectionError`` and
-    return an appropriate ``UNSUPPORTED_TYPE`` response.
+    Configuration endpoints use ``/cm?cmnd=`` with ``backlog`` for multi-command
+    sequences.  Callers catch ``DeviceConnectionError`` for unsupported
+    combinations.
     """
 
     if endpoint_name == "set_flags":
         flags: int = params.get("flags", 0)
         if not isinstance(flags, int) or flags < 0:
-            raise DeviceConnectionError(
-                "[INVALID_PARAM] flags must be a non-negative integer bitfield"
-            )
-        # Tasmota SetOption only exists for options 0-31.
+            raise DeviceConnectionError("[INVALID_PARAM] flags must be non-negative")
+        # Tasmota SetOption 0-31. Build backlog for multi-bit.
+        commands: list[str] = []
         for bit in range(32):
             if (flags >> bit) & 1:
-                return (f"/cm?cmnd=SetOption{bit}%201", "tasmota")
-        raise DeviceConnectionError(
-            "[UNSUPPORTED_TYPE] Tasmota SetOption only covers options 0-31; "
-            "higher flags are OpenBK-specific. Use the Tasmota WebUI for GPIO/Module configuration."
-        )
+                commands.append(f"SetOption{bit} 1")
+        if not commands:
+            raise DeviceConnectionError("[INVALID_PARAM] No flags set in bitfield")
+        cmd = "; ".join(commands)
+        if len(commands) > 1:
+            return (f"/cm?cmnd=backlog%20{urllib.parse.quote(cmd)}", "tasmota")
+        return (f"/cm?cmnd={urllib.parse.quote(commands[0])}", "tasmota")
 
-    if endpoint_name in (
-        "set_name",
-        "configure_mqtt",
-        "set_gpio",
-        "start_ha_discovery",
-    ):
+    if endpoint_name == "set_name":
+        short = str(params.get("short_name", ""))
+        full = str(params.get("full_name", ""))
+        if full:
+            cmd = f"DeviceName {full}; FriendlyName1 {short}"
+            return (f"/cm?cmnd=backlog%20{urllib.parse.quote(cmd)}", "tasmota")
+        return (f"/cm?cmnd=DeviceName%20{urllib.parse.quote(short)}", "tasmota")
+
+    if endpoint_name == "configure_mqtt":
+        parts = []
+        for key, cmd in [
+            ("host", "MqttHost"), ("port", "MqttPort"), ("client", "MqttClient"),
+            ("group", "GroupTopic"), ("user", "MqttUser"), ("password", "MqttPassword"),
+        ]:
+            val = params.get(key)
+            if val is not None and str(val):
+                parts.append(f"{cmd} {val}")
+        if not parts:
+            raise DeviceConnectionError("[INVALID_PARAM] No MQTT parameters provided")
+        if len(parts) == 1:
+            return (f"/cm?cmnd={urllib.parse.quote(parts[0])}", "tasmota")
+        return (f"/cm?cmnd=backlog%20{urllib.parse.quote('; '.join(parts))}", "tasmota")
+
+    if endpoint_name == "set_friendly_name":
+        name = str(params.get("friendly_name", ""))
+        return (f"/cm?cmnd=FriendlyName1%20{urllib.parse.quote(name)}", "tasmota")
+
+    if endpoint_name == "start_ha_discovery":
+        return ("/cm?cmnd=SetOption19%201", "tasmota")
+
+    if endpoint_name == "set_startup_command":
+        command = str(params.get("command", ""))
+        rule = f"Rule1 ON System#Boot do {command} endon"
+        return (f"/cm?cmnd=backlog%20{urllib.parse.quote(rule)}%3BRule1%201", "tasmota")
+
+    if endpoint_name in ("set_gpio",):
         raise DeviceConnectionError(
-            f"[UNSUPPORTED_TYPE] {endpoint_name} is not supported via "
-            f"HTTP GET on Tasmota devices. Use the Tasmota WebUI or the "
-            f"existing MQTT tools (iot_mqtt_publish) instead."
+            "[UNSUPPORTED_TYPE] GPIO configuration requires Module/GPIO commands "
+            "on Tasmota -- use the WebUI or iot_execute_command instead."
         )
 
     raise DeviceConnectionError(

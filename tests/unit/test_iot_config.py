@@ -980,23 +980,20 @@ class TestSetStartupCommand:
                 assert data["success"] is False
                 assert data["error"]["code"] == "DEVICE_NOT_FOUND"
 
-    def test_set_startup_command_tasmota_unsupported(self):
-        """Tasmota — UNSUPPORTED_TYPE."""
-        from tools.http_session import DeviceConnectionError
-
+    def test_set_startup_command_tasmota_success(self):
+        """Tasmota — Rule1 URL is built and command is executed successfully."""
         with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"):
             with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
                 with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
                     mock_session = MagicMock()
-                    mock_session.get_form.side_effect = DeviceConnectionError(
-                        "[UNSUPPORTED_TYPE] set_startup_command is only supported on OpenBK"
-                    )
+                    mock_session.get_form.return_value = "OK"
                     mock_session_cls.return_value = mock_session
 
                     result = _set_startup_command("192.168.1.100", "cmd")
                     data = json.loads(result)
-                    assert data["success"] is False
-                    assert data["error"]["code"] == "UNSUPPORTED_TYPE"
+                    assert data["success"] is True
+                    assert data["data"]["device_type"] == "tasmota"
+                    assert data["data"]["command"] == "cmd"
 
     def test_set_startup_command_device_connection_error(self):
         """Device unreachable — DEVICE_ERROR."""
@@ -1194,8 +1191,8 @@ class TestGetFullInfo:
 class TestRegistrationWrappers:
     """Tests for MCP tool registration and wrapper exception handlers."""
 
-    def test_registration_creates_eight_tools(self, mock_mcp):
-        """register_iot_config_tools registers exactly 8 tools."""
+    def test_registration_creates_nine_tools(self, mock_mcp):
+        """register_iot_config_tools registers exactly 9 tools."""
         register_iot_config_tools(mock_mcp)
         assert "iot_set_flags" in mock_mcp._tools
         assert "iot_set_name" in mock_mcp._tools
@@ -1204,8 +1201,9 @@ class TestRegistrationWrappers:
         assert "iot_execute_command" in mock_mcp._tools
         assert "iot_start_ha_discovery" in mock_mcp._tools
         assert "iot_set_startup_command" in mock_mcp._tools
+        assert "iot_set_friendly_name" in mock_mcp._tools
         assert "iot_get_full_info" in mock_mcp._tools
-        assert len(mock_mcp._tools) == 8
+        assert len(mock_mcp._tools) == 9
 
     def test_iot_set_flags_wrapper(self, mock_mcp):
         """iot_set_flags wrapper delegates to _set_flags and succeeds."""

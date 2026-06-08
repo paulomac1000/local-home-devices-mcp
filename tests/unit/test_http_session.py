@@ -472,7 +472,7 @@ class TestBuildUrlTasmota:
 
     def test_set_flags_no_bits_raises(self):
         """tasmota set_flags with flags=0 raises DeviceConnectionError."""
-        with pytest.raises(DeviceConnectionError, match="UNSUPPORTED_TYPE"):
+        with pytest.raises(DeviceConnectionError, match="INVALID_PARAM"):
             _build_url("tasmota", "set_flags", flags=0)
 
     def test_set_flags_bit30_is_valid(self):
@@ -497,25 +497,28 @@ class TestBuildUrlTasmota:
         with pytest.raises(DeviceConnectionError, match="INVALID_PARAM"):
             _build_url("tasmota", "set_flags", flags=-1)
 
-    def test_set_name_raises_unsupported(self):
-        """tasmota set_name raises UNSUPPORTED_TYPE."""
-        with pytest.raises(DeviceConnectionError, match="UNSUPPORTED_TYPE"):
-            _build_url("tasmota", "set_name", short_name="Test")
+    def test_set_name_tasmota_short_only(self):
+        """tasmota set_name with only short_name returns DeviceName URL."""
+        path, dtype = _build_url("tasmota", "set_name", short_name="Test")
+        assert dtype == "tasmota"
+        assert path == "/cm?cmnd=DeviceName%20Test"
 
-    def test_configure_mqtt_raises_unsupported(self):
-        """tasmota configure_mqtt raises UNSUPPORTED_TYPE."""
-        with pytest.raises(DeviceConnectionError, match="UNSUPPORTED_TYPE"):
-            _build_url("tasmota", "configure_mqtt", host="192.168.1.1")
+    def test_configure_mqtt_tasmota_single(self):
+        """tasmota configure_mqtt with single param returns single command URL."""
+        path, dtype = _build_url("tasmota", "configure_mqtt", host="192.168.1.1")
+        assert dtype == "tasmota"
+        assert path == "/cm?cmnd=MqttHost%20192.168.1.1"
 
     def test_set_gpio_raises_unsupported(self):
         """tasmota set_gpio raises UNSUPPORTED_TYPE."""
         with pytest.raises(DeviceConnectionError, match="UNSUPPORTED_TYPE"):
             _build_url("tasmota", "set_gpio", pin=6, role="Relay")
 
-    def test_start_ha_discovery_raises_unsupported(self):
-        """tasmota start_ha_discovery raises UNSUPPORTED_TYPE."""
-        with pytest.raises(DeviceConnectionError, match="UNSUPPORTED_TYPE"):
-            _build_url("tasmota", "start_ha_discovery")
+    def test_start_ha_discovery_tasmota(self):
+        """tasmota start_ha_discovery returns SetOption19 URL."""
+        path, dtype = _build_url("tasmota", "start_ha_discovery")
+        assert dtype == "tasmota"
+        assert path == "/cm?cmnd=SetOption19%201"
 
 
 # =============================================================================
