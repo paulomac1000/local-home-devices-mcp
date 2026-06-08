@@ -5,11 +5,11 @@ All fixtures use generic names (Tasmota_Test, OpenBK_Test).
 No real devices, credentials, or network calls.
 """
 
+import shutil as _shutil
 import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
-import shutil as _shutil
 
 from tests.fixtures import MOCK_OPENBK_DEVICE, MOCK_TASMOTA_DEVICE
 
