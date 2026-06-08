@@ -38,9 +38,9 @@ repos:
 
       - id: mypy
         name: mypy
-        entry: python3 -m mypy tools/
+        entry: python3 -m mypy tools/ --strict --no-warn-unused-ignores
         language: python
-        additional_dependencies: ["mypy>=1.0", "types-PyYAML"]
+        additional_dependencies: ["mypy>=1.0", "types-PyYAML", "paho-mqtt>=2.0"]
         pass_filenames: false
 
       - id: bandit

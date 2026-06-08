@@ -38,7 +38,7 @@ def _get_mqtt_client() -> Any:
         try:
             # paho-mqtt >= 2.0 requires callback_api_version
             CallbackAPIVersion = getattr(mqtt, "CallbackAPIVersion")
-            client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION1)
+            client = mqtt.Client(callback_api_version=CallbackAPIVersion.VERSION1)  # type: ignore[call-arg]
         except AttributeError:
             # paho-mqtt < 2.0
             client = mqtt.Client()
