@@ -82,9 +82,7 @@ class TestOpenBKLive:
     @openbk_skip
     def test_execute_command_status_returns_info(self, mcp_client):
         """iot_execute_command 'Status 0' returns device status for OpenBK."""
-        data = _call(
-            mcp_client, "iot_execute_command", identifier=OPENBK_IP, command="Status 0"
-        )
+        data = _call(mcp_client, "iot_execute_command", identifier=OPENBK_IP, command="Status 0")
 
         assert data.get("success") is True, f"Expected success, got: {data}"
         resp = data.get("data", {})
@@ -149,9 +147,7 @@ class TestTasmotaLive:
     @tasmota_skip
     def test_execute_command_status_fwr(self, mcp_client):
         """iot_execute_command 'Status 2' returns StatusFWR for Tasmota."""
-        data = _call(
-            mcp_client, "iot_execute_command", identifier=TASMOTA_IP, command="Status 2"
-        )
+        data = _call(mcp_client, "iot_execute_command", identifier=TASMOTA_IP, command="Status 2")
 
         assert data.get("success") is True, f"Expected success, got: {data}"
         resp = data.get("data", {})

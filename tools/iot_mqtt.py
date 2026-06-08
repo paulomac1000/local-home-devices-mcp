@@ -156,9 +156,7 @@ def _mqtt_get_state(topic_prefix: str, timeout_seconds: int = 10) -> str:
                 info_str = _get_device_info(topic_prefix)
                 info = json.loads(info_str) if isinstance(info_str, str) else info_str
                 if info.get("success"):
-                    dev_info = (
-                        info.get("data", info).get("info", info.get("data", {}))
-                    )
+                    dev_info = info.get("data", info).get("info", info.get("data", {}))
                     channels = dev_info.get("channels", 1)
                     if channels == 0:
                         return _success_response(

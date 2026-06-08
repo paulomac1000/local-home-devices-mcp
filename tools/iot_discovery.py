@@ -320,8 +320,7 @@ def _probe_device_info(ip: str, device_type: str, timeout: int = 5) -> dict[str,
                 # BK7231N_/BK7231T_ MQTT topic prefix = OpenBK device
                 # Re-classify even when Tasmota compatibility layer returns Status JSON
                 if info["topic"] and (
-                    info["topic"].startswith("BK7231N_")
-                    or info["topic"].startswith("BK7231T_")
+                    info["topic"].startswith("BK7231N_") or info["topic"].startswith("BK7231T_")
                 ):
                     info["type"] = "openbk"
 

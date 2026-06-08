@@ -53,9 +53,7 @@ def _api_post(tool_name: str, data: dict) -> dict:
     """
     url = f"{REST_API_URL}/api/tools/{tool_name}"
     payload = json.dumps(data).encode()
-    req = urllib.request.Request(
-        url, data=payload, headers={"Content-Type": "application/json"}
-    )
+    req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=5) as resp:
             return json.loads(resp.read())
@@ -170,9 +168,7 @@ class TestReadOnlyWorkflows:
         else:
             # Graceful error when device unreachable
             code = _get_error_code(full_info)
-            assert _failure_is_allowed(code), (
-                f"get_full_info unexpected error: {fi_result}"
-            )
+            assert _failure_is_allowed(code), f"get_full_info unexpected error: {fi_result}"
 
         # Step 2: execute_command Status 0
         cmd_resp = _api_post(
@@ -300,9 +296,7 @@ class TestCommandBlocklist:
             assert "command" in data
         else:
             # Must NOT be COMMAND_BLOCKED -- force=True should bypass
-            assert code != "COMMAND_BLOCKED", (
-                f"force=True should bypass blocklist, got: {resp}"
-            )
+            assert code != "COMMAND_BLOCKED", f"force=True should bypass blocklist, got: {resp}"
             # Other errors are acceptable (no device, write disabled, etc.)
             assert _failure_is_allowed(code) or code is None, (
                 f"Unexpected error for force=True restart: {code} - {resp}"
@@ -329,9 +323,7 @@ class TestWriteGateAndErrors:
         When write operations ARE enabled, the call proceeds (may succeed
         or get a device-level error -- both are valid).
         """
-        resp = _api_post(
-            "iot_set_flags", {"identifier": _PLACEHOLDER_ID, "flags": 0}
-        )
+        resp = _api_post("iot_set_flags", {"identifier": _PLACEHOLDER_ID, "flags": 0})
         code = _get_error_code(resp)
 
         if code == "WRITE_DISABLED":
@@ -342,9 +334,7 @@ class TestWriteGateAndErrors:
             pass
         else:
             # Write enabled, but device unreachable / validation failed
-            assert _failure_is_allowed(code), (
-                f"set_flags unexpected error: {code} - {resp}"
-            )
+            assert _failure_is_allowed(code), f"set_flags unexpected error: {code} - {resp}"
 
     def test_get_full_info_works_with_bad_identifier(self):
         """Unreachable IP returns structured error, never a crash.
@@ -354,9 +344,7 @@ class TestWriteGateAndErrors:
         resp = _api_post("iot_get_full_info", {"identifier": _UNREACHABLE_IP})
 
         # The REST API wrapper must not crash (status 200 or 500, not 5xx crash)
-        assert "result" in resp or "error" in resp, (
-            f"Response missing result/error: {resp}"
-        )
+        assert "result" in resp or "error" in resp, f"Response missing result/error: {resp}"
 
         result = _get_tool_result(resp)
         if result.get("success"):
@@ -381,13 +369,7 @@ class TestWriteGateAndErrors:
     def test_nonexistent_tool_returns_structured_error(self):
         """Calling a tool that does not exist returns a 404 with details."""
         resp = _api_post("iot_nonexistent_tool_123", {})
-        assert resp.get("success") is False, (
-            f"Nonexistent tool should fail: {resp}"
-        )
+        assert resp.get("success") is False, f"Nonexistent tool should fail: {resp}"
         # Should include available_tools or an error message
-        has_context = (
-            "available_tools" in resp
-            or "error" in resp
-            or "total_tools" in resp
-        )
+        has_context = "available_tools" in resp or "error" in resp or "total_tools" in resp
         assert has_context, f"Error response lacks context: {resp}"

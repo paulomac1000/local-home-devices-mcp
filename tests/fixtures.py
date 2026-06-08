@@ -68,9 +68,7 @@ MOCK_TASMOTA_MQTTHOST = "192.0.2.100"
 MOCK_TASMOTA_BACKLOG_OK = {}
 
 # Timeout response
-MOCK_DEVICE_TIMEOUT_RESPONSE = {
-    "error": True, "response": "Connection timed out"
-}
+MOCK_DEVICE_TIMEOUT_RESPONSE = {"error": True, "response": "Connection timed out"}
 
 # --------------------------------------------------------------------------- #
 # OpenBK Status 0 response (anonymized real device data)

@@ -122,10 +122,14 @@ jobs:
       - name: Smoke test - tool count
         run: |
           docker run --rm local-home-devices-mcp:test python3 -c "
+          import yaml, sys
           from server import get_tool_count
+          with open('.github/ci-cd-config.yaml') as f:
+              cfg = yaml.safe_load(f)
+          expected = cfg.get('expected_tools', 0)
           tc = get_tool_count()
-          assert tc == 51, f'Expected 51 tools, got {tc}'
-          print('Tool count OK:', tc)
+          assert tc == expected, f'Expected {expected} tools, got {tc}'
+          print(f'Tool count OK: {tc} / {expected}')
           "
 
       - name: Smoke test - REST API health + tools

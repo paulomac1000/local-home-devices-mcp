@@ -421,7 +421,7 @@ def _execute_command(
             if first_word.lower() == blocked.lower():
                 # Smart check: allow 'backlog' if no destructive sub-commands
                 if blocked == "backlog":
-                    rest = command.strip()[len(first_word):].strip().lower()
+                    rest = command.strip()[len(first_word) :].strip().lower()
                     has_blocked = any(
                         bad in rest for bad in ("format", "reset", "restart", "ota", "flash")
                     )
@@ -432,9 +432,7 @@ def _execute_command(
                                 f"Command '{command}' is blocked. "
                                 f"'backlog' contains destructive sub-commands."
                             ),
-                            suggestion=(
-                                "Remove destructive sub-commands or pass force=True."
-                            ),
+                            suggestion=("Remove destructive sub-commands or pass force=True."),
                         )
                     # Safe backlog — allow it
                     continue
@@ -444,9 +442,7 @@ def _execute_command(
                         f"Command '{command}' is blocked. "
                         f"'{first_word}' requires force=True to execute."
                     ),
-                    suggestion=(
-                        "Pass force=True to bypass this safety check."
-                    ),
+                    suggestion=("Pass force=True to bypass this safety check."),
                 )
 
     ip_address = _resolve_or_fail(identifier)
@@ -634,11 +630,13 @@ def _set_friendly_name(identifier: str, friendly_name: str, timeout_seconds: int
         )
         session = _DeviceHttpSession(f"http://{ip_address}", default_timeout=timeout_seconds)
         session.get_form(url_path)
-        return _success_response({
-            "device_type": dev_type,
-            "friendly_name": friendly_name,
-            "ip": ip_address,
-        })
+        return _success_response(
+            {
+                "device_type": dev_type,
+                "friendly_name": friendly_name,
+                "ip": ip_address,
+            }
+        )
     except DeviceConnectionError as exc:
         msg = str(exc)
         if msg.startswith("[UNSUPPORTED_TYPE]"):
@@ -692,13 +690,13 @@ def _get_full_info(identifier: str, timeout_seconds: int = 10) -> str:
 
     # Parse the Status 0 JSON response
     # Each Status* block is a top-level key in the JSON
-    status_main = data.get("Status", {})      # DeviceName, FriendlyName, Topic
-    status_fwr = data.get("StatusFWR", {})     # Version, BuildDateTime, Hardware
-    status_net = data.get("StatusNET", {})     # Mac, IPAddress, Hostname
-    status_mqt = data.get("StatusMQT", {})     # MqttHost, MqttPort, MqttClient
-    status_sts = data.get("StatusSTS", {})     # Uptime, UptimeSec, Wifi, POWER
-    status_prm = data.get("StatusPRM", {})     # Uptime, GroupTopic, RestartReason
-    status_log = data.get("StatusLOG", {})     # SetOption array (flags)
+    status_main = data.get("Status", {})  # DeviceName, FriendlyName, Topic
+    status_fwr = data.get("StatusFWR", {})  # Version, BuildDateTime, Hardware
+    status_net = data.get("StatusNET", {})  # Mac, IPAddress, Hostname
+    status_mqt = data.get("StatusMQT", {})  # MqttHost, MqttPort, MqttClient
+    status_sts = data.get("StatusSTS", {})  # Uptime, UptimeSec, Wifi, POWER
+    status_prm = data.get("StatusPRM", {})  # Uptime, GroupTopic, RestartReason
+    status_log = data.get("StatusLOG", {})  # SetOption array (flags)
 
     device_name = data.get("DeviceName", status_main.get("DeviceName", ""))
 
@@ -1042,9 +1040,7 @@ def register_iot_config_tools(mcp: Any) -> None:
 
     @mcp.tool()
     @inject_tool_risk_prefix
-    def iot_set_startup_command(
-        identifier: str, command: str, timeout_seconds: int = 10
-    ) -> str:
+    def iot_set_startup_command(identifier: str, command: str, timeout_seconds: int = 10) -> str:
         """Set device startup command (autoexec) on an OpenBK device.
 
         The startup command is the only HTTP-based way to persist GPIO

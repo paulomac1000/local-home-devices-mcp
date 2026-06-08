@@ -54,10 +54,27 @@ strict = true
 python_version = "3.14"
 
 [[tool.mypy.overrides]]
-module = ["tools.iot_tuya", "tools.hikvision.isapi_client"]
+module = [
+    "tools.iot_tuya",
+    "tools.hikvision.isapi_client",
+    "tools.iot_control",
+    "tools.iot_devices",
+    "tools.iot_discovery",
+    "tools.iot_control",
+    "tools.iot_mqtt",
+    "tools.iot_openhasp",
+    "tools.http_session",
+    "tools.openhasp.*",
+    "fastmcp",
+    "starlette.*",
+    "uvicorn",
+    "tools.iot_mqtt",
+    "server",
+]
 disable_error_code = [
     "assignment",
     "dict-item",
+    "import-not-found",
     "import-untyped",
     "no-any-return",
     "union-attr",

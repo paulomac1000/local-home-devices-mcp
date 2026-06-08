@@ -224,6 +224,38 @@ local-home-devices-mcp/
 3. **Docker build**: Build image and verify tool count via `python -c "from server import get_tool_count"`
 4. **Smoke test (Docker)**: Start container, curl health + tools endpoints, assert tool count, stop container
 
+## Pre-commit Hooks
+
+This project uses pre-commit hooks to catch issues before they reach CI. The hooks mirror our CI lint and test jobs exactly.
+
+### Setup
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+### Manual Run
+
+```bash
+pre-commit run --all-files
+```
+
+### Hook Summary
+
+| Hook | Stage | Purpose | CI Equivalent |
+|------|-------|---------|---------------|
+| trailing-whitespace | pre-commit | Remove trailing whitespace | -- |
+| end-of-file-fixer | pre-commit | Ensure files end with newline | -- |
+| check-yaml/toml/json | pre-commit | Validate config file syntax | -- |
+| detect-private-key | pre-commit | Prevent committing secrets | -- |
+| ruff check | pre-commit | Lint Python code | ci.yml lint job |
+| ruff format --check | pre-commit | Format Python code | ci.yml lint job |
+| mypy | pre-commit | Static type checking | ci.yml lint job |
+| bandit | pre-commit | Security scanning | ci.yml lint job |
+| pytest unit | pre-commit | Run unit tests | ci.yml test job |
+| tool count validate | pre-commit | Verify MCP tool count | ci.yml docker-smoke |
+
 ## Common Pitfalls
 
 ### Hardcoded IPs and Ports

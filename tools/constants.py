@@ -680,8 +680,7 @@ TOOL_MANIFESTS: dict[str, dict[str, Any]] = {
             "iot_get_full_info", timeout_ms=10000, latency="moderate", privacy="metadata"
         ),
         "description": (
-            "Get comprehensive device info "
-            "(MAC, firmware version, flags, MQTT, WiFi) from Status 0"
+            "Get comprehensive device info (MAC, firmware version, flags, MQTT, WiFi) from Status 0"
         ),
     },
     "iot_get_device_info": _make_manifest(

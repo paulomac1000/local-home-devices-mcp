@@ -330,8 +330,12 @@ def _build_tasmota_url(endpoint_name: str, **params: Any) -> tuple[str, str]:
     if endpoint_name == "configure_mqtt":
         parts = []
         for key, cmd in [
-            ("host", "MqttHost"), ("port", "MqttPort"), ("client", "MqttClient"),
-            ("group", "GroupTopic"), ("user", "MqttUser"), ("password", "MqttPassword"),
+            ("host", "MqttHost"),
+            ("port", "MqttPort"),
+            ("client", "MqttClient"),
+            ("group", "GroupTopic"),
+            ("user", "MqttUser"),
+            ("password", "MqttPassword"),
         ]:
             val = params.get(key)
             if val is not None and str(val):

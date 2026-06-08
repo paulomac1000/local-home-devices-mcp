@@ -109,16 +109,16 @@ class TestConfigToolsLive:
 
     def test_get_full_info_unresolvable_name(self, mcp_client):
         """Call with nonexistent device name — expect NAME_NOT_RESOLVED error."""
-        data = _get_result(
-            mcp_client, "iot_get_full_info", identifier="NoSuchDevice_XYZ"
-        )
+        data = _get_result(mcp_client, "iot_get_full_info", identifier="NoSuchDevice_XYZ")
         assert data["success"] is False
         assert "Could not resolve" in data["error"]["message"]
 
     def test_get_full_info_unreachable_ip(self, mcp_client):
         """Call with unreachable IP — expect error response."""
         data = _get_result(
-            mcp_client, "iot_get_full_info", identifier="192.168.1.199",
+            mcp_client,
+            "iot_get_full_info",
+            identifier="192.168.1.199",
             timeout_seconds=3,
         )
         assert data["success"] is False
@@ -126,7 +126,10 @@ class TestConfigToolsLive:
     def test_set_flags_name_not_found(self, mcp_client):
         """Write tool with nonexistent name -- safe error path, no HTTP to device."""
         data = _get_result(
-            mcp_client, "iot_set_flags", identifier="NoSuchDevice_XYZ", flags=0,
+            mcp_client,
+            "iot_set_flags",
+            identifier="NoSuchDevice_XYZ",
+            flags=0,
         )
         assert data["success"] is False
         assert "Could not resolve" in data["error"]["message"]
@@ -164,31 +167,37 @@ class TestConfigWriteCycle:
         try:
             # 3. Apply new flags
             set_data = _get_result(
-                mcp_client, "iot_set_flags",
-                identifier=_REAL_DEVICE_IP, flags=target_flags,
+                mcp_client,
+                "iot_set_flags",
+                identifier=_REAL_DEVICE_IP,
+                flags=target_flags,
             )
             assert set_data["success"] is True
 
             # 4. Verify the change took effect
             verify_data = _get_result(
-                mcp_client, "iot_get_full_info", identifier=_REAL_DEVICE_IP,
+                mcp_client,
+                "iot_get_full_info",
+                identifier=_REAL_DEVICE_IP,
             )
             assert verify_data["success"] is True
             actual = verify_data["data"]["flags"]["generic_flags"]
-            assert actual == target_flags, (
-                f"Expected flags={target_flags}, got {actual}"
-            )
+            assert actual == target_flags, f"Expected flags={target_flags}, got {actual}"
         finally:
             # 5. Always restore original flags
             restore_data = _get_result(
-                mcp_client, "iot_set_flags",
-                identifier=_REAL_DEVICE_IP, flags=original_flags,
+                mcp_client,
+                "iot_set_flags",
+                identifier=_REAL_DEVICE_IP,
+                flags=original_flags,
             )
             assert restore_data["success"] is True
 
             # Verify restoration
             final_data = _get_result(
-                mcp_client, "iot_get_full_info", identifier=_REAL_DEVICE_IP,
+                mcp_client,
+                "iot_get_full_info",
+                identifier=_REAL_DEVICE_IP,
             )
             assert final_data["success"] is True
             assert final_data["data"]["flags"]["generic_flags"] == original_flags
@@ -252,8 +261,10 @@ class TestConfigToolsMocked:
             },
         }
 
-        with patch("tools.iot_discovery._detect_device_type", return_value="openbk"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_discovery._detect_device_type", return_value="openbk"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session.get_json.return_value = mock_openbk_status
             mock_session_cls.return_value = mock_session
@@ -303,8 +314,10 @@ class TestConfigToolsMocked:
             "SetOption01": "08",
         }
 
-        with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session.get_json.return_value = mock_tasmota_status
             mock_session_cls.return_value = mock_session
@@ -333,7 +346,10 @@ class TestConfigToolsMocked:
     def test_set_flags_negative_value(self, mcp_client):
         """Negative flags value — expect INVALID_PARAM error."""
         data = _get_result(
-            mcp_client, "iot_set_flags", identifier="192.168.1.100", flags=-1,
+            mcp_client,
+            "iot_set_flags",
+            identifier="192.168.1.100",
+            flags=-1,
         )
         assert data["success"] is False
         assert data["error"]["code"] == "INVALID_PARAM"
@@ -341,7 +357,10 @@ class TestConfigToolsMocked:
     def test_set_name_empty_short_name(self, mcp_client):
         """Empty short_name — expect INVALID_PARAM error."""
         data = _get_result(
-            mcp_client, "iot_set_name", identifier="192.168.1.100", short_name="",
+            mcp_client,
+            "iot_set_name",
+            identifier="192.168.1.100",
+            short_name="",
         )
         assert data["success"] is False
         assert "error" in data
@@ -353,7 +372,9 @@ class TestConfigToolsMocked:
     def test_execute_command_blocked_without_force(self, mcp_client):
         """'restart' is blocked — expect COMMAND_BLOCKED error."""
         data = _get_result(
-            mcp_client, "iot_execute_command", identifier="192.168.1.100",
+            mcp_client,
+            "iot_execute_command",
+            identifier="192.168.1.100",
             command="restart",
         )
         assert data["success"] is False
@@ -361,15 +382,20 @@ class TestConfigToolsMocked:
 
     def test_execute_command_force_allows_blocked(self, mcp_client):
         """force=True bypasses the blocklist and submits a blocked command."""
-        with patch("tools.iot_discovery._detect_device_type", return_value="openbk"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_discovery._detect_device_type", return_value="openbk"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session.get_form.return_value = '{"Status": "OK"}'
             mock_session_cls.return_value = mock_session
 
             data = _get_result(
-                mcp_client, "iot_execute_command", identifier="192.168.1.100",
-                command="restart", force=True,
+                mcp_client,
+                "iot_execute_command",
+                identifier="192.168.1.100",
+                command="restart",
+                force=True,
             )
             assert data["success"] is True
             assert data["data"]["command"] == "restart"

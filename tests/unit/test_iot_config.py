@@ -4,6 +4,7 @@ Unit tests for tools/iot_config.py — IoT device configuration tools.
 Tests flag setting, device naming, MQTT configuration, GPIO pin assignment,
 command execution with blocklist, HA discovery triggering, and full info retrieval.
 """
+
 import json
 from unittest.mock import MagicMock, patch
 
@@ -1977,9 +1978,11 @@ class TestTasmotaConfigTools:
 
     def test_set_name_tasmota_backlog(self):
         """Both names on Tasmota — backlog URL with DeviceName and FriendlyName1."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session_cls.return_value = mock_session
 
@@ -1998,9 +2001,11 @@ class TestTasmotaConfigTools:
 
     def test_set_name_tasmota_short_only(self):
         """Only short_name on Tasmota — URL contains DeviceName but NOT FriendlyName1 or backlog."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session_cls.return_value = mock_session
 
@@ -2015,9 +2020,11 @@ class TestTasmotaConfigTools:
 
     def test_set_flags_tasmota_single_bit(self):
         """Single bit 0 on Tasmota — URL has SetOption0 but NOT backlog."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session.get_json.return_value = {}
             mock_session_cls.return_value = mock_session
@@ -2033,9 +2040,11 @@ class TestTasmotaConfigTools:
 
     def test_set_flags_tasmota_multi_bit(self):
         """Bits 0 and 3 on Tasmota — URL uses backlog with SetOption0 and SetOption3."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session.get_json.return_value = {}
             mock_session_cls.return_value = mock_session
@@ -2051,9 +2060,11 @@ class TestTasmotaConfigTools:
 
     def test_set_flags_tasmota_high_bit(self):
         """Bit 31 on Tasmota — URL uses SetOption31, no backlog."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session.get_json.return_value = {}
             mock_session_cls.return_value = mock_session
@@ -2067,8 +2078,10 @@ class TestTasmotaConfigTools:
 
     def test_set_flags_tasmota_bit_32_error(self):
         """Bit 32 outside Tasmota 32-bit range — no commands to send, INVALID_PARAM."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+        ):
             result = _set_flags("192.168.1.100", 1 << 32)
             data = json.loads(result)
             assert data["success"] is False
@@ -2076,9 +2089,11 @@ class TestTasmotaConfigTools:
 
     def test_configure_mqtt_tasmota_single(self):
         """Single MQTT host on Tasmota — URL contains MqttHost."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session_cls.return_value = mock_session
 
@@ -2093,9 +2108,11 @@ class TestTasmotaConfigTools:
 
     def test_configure_mqtt_tasmota_multi(self):
         """Multiple MQTT params — backlog URL with MqttHost, MqttPort, MqttClient."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session_cls.return_value = mock_session
 
@@ -2116,9 +2133,11 @@ class TestTasmotaConfigTools:
 
     def test_start_ha_discovery_tasmota(self):
         """HA discovery on Tasmota — URL contains SetOption19."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session_cls.return_value = mock_session
 
@@ -2132,9 +2151,11 @@ class TestTasmotaConfigTools:
 
     def test_set_startup_command_tasmota(self):
         """Startup command on Tasmota — URL contains Rule1 and System#Boot."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session_cls.return_value = mock_session
 
@@ -2149,9 +2170,11 @@ class TestTasmotaConfigTools:
 
     def test_set_friendly_name_tasmota(self):
         """Set friendly name on Tasmota — URL contains FriendlyName1."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session_cls.return_value = mock_session
 
@@ -2168,9 +2191,11 @@ class TestTasmotaConfigTools:
         """Tasmota Status 0 JSON parsed — version, mac, device_type from fixture."""
         from tests.mock_data.mock_responses import tasmota_status0_response
 
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session.get_json.return_value = tasmota_status0_response()
             mock_session_cls.return_value = mock_session
@@ -2194,8 +2219,10 @@ class TestTasmotaConfigTools:
 
     def test_tasmota_device_not_found(self):
         """No IoT device detected — DEVICE_NOT_FOUND."""
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value=None):
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value=None),
+        ):
             result = _set_name("192.168.1.100", "Test")
             data = json.loads(result)
             assert data["success"] is False
@@ -2205,9 +2232,11 @@ class TestTasmotaConfigTools:
         """DeviceConnectionError during HTTP call — DEVICE_ERROR."""
         from tools.http_session import DeviceConnectionError
 
-        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
-             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
-             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+        with (
+            patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"),
+            patch("tools.iot_discovery._detect_device_type", return_value="tasmota"),
+            patch("tools.iot_config._DeviceHttpSession") as mock_session_cls,
+        ):
             mock_session = MagicMock()
             mock_session.get_form.side_effect = DeviceConnectionError("Connection refused")
             mock_session_cls.return_value = mock_session

@@ -163,9 +163,7 @@ class TestGetJson:
         """ConnectionError raises DeviceConnectionError with 'Connection failed'."""
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
-        mock_session.get.side_effect = requests.exceptions.ConnectionError(
-            "Connection refused"
-        )
+        mock_session.get.side_effect = requests.exceptions.ConnectionError("Connection refused")
 
         session = _DeviceHttpSession("http://192.168.1.100")
 
@@ -191,15 +189,11 @@ class TestGetJson:
             session.get_json("/test")
 
     @patch("tools.http_session.requests.Session")
-    def test_generic_request_exception_raises_device_connection_error(
-        self, mock_session_cls
-    ):
+    def test_generic_request_exception_raises_device_connection_error(self, mock_session_cls):
         """Generic RequestException raises DeviceConnectionError."""
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
-        mock_session.get.side_effect = requests.exceptions.RequestException(
-            "Something broke"
-        )
+        mock_session.get.side_effect = requests.exceptions.RequestException("Something broke")
 
         session = _DeviceHttpSession("http://192.168.1.100")
 
@@ -251,9 +245,7 @@ class TestGetForm:
         """ConnectionError raises DeviceConnectionError."""
         mock_session = MagicMock()
         mock_session_cls.return_value = mock_session
-        mock_session.get.side_effect = requests.exceptions.ConnectionError(
-            "Connection refused"
-        )
+        mock_session.get.side_effect = requests.exceptions.ConnectionError("Connection refused")
 
         session = _DeviceHttpSession("http://192.168.1.100")
 
@@ -341,9 +333,7 @@ class TestBuildUrlOpenBK:
 
     def test_set_name(self):
         """openbk set_name returns URL with shortName and name."""
-        path, dtype = _build_url(
-            "openbk", "set_name", short_name="Test", full_name="Test_Device"
-        )
+        path, dtype = _build_url("openbk", "set_name", short_name="Test", full_name="Test_Device")
         assert dtype == "openbk"
         assert path.startswith("/cfg_name?")
         # shortName is URL-quoted raw, then name is URL-quoted
@@ -396,9 +386,7 @@ class TestBuildUrlOpenBK:
 
     def test_set_gpio(self):
         """openbk set_gpio returns URL with pin role and channel."""
-        path, dtype = _build_url(
-            "openbk", "set_gpio", pin=6, role="Relay", channel=1
-        )
+        path, dtype = _build_url("openbk", "set_gpio", pin=6, role="Relay", channel=1)
         assert dtype == "openbk"
         assert path.startswith("/cfg_pins?")
         assert "pin6_role=Relay" in path
@@ -406,26 +394,20 @@ class TestBuildUrlOpenBK:
 
     def test_set_gpio_quotes_special_chars(self):
         """openbk set_gpio URL-encodes role with special characters."""
-        path, dtype = _build_url(
-            "openbk", "set_gpio", pin=0, role="Relay High", channel=2
-        )
+        path, dtype = _build_url("openbk", "set_gpio", pin=0, role="Relay High", channel=2)
         assert dtype == "openbk"
         assert "pin0_role=Relay%20High" in path
         assert "pin0_channel=2" in path
 
     def test_start_ha_discovery(self):
         """openbk start_ha_discovery returns URL with prefix."""
-        path, dtype = _build_url(
-            "openbk", "start_ha_discovery", prefix="homeassistant"
-        )
+        path, dtype = _build_url("openbk", "start_ha_discovery", prefix="homeassistant")
         assert dtype == "openbk"
         assert path == "/ha_discovery?prefix=homeassistant"
 
     def test_start_ha_discovery_custom_prefix(self):
         """openbk start_ha_discovery with custom prefix."""
-        path, dtype = _build_url(
-            "openbk", "start_ha_discovery", prefix="custom_prefix"
-        )
+        path, dtype = _build_url("openbk", "start_ha_discovery", prefix="custom_prefix")
         assert dtype == "openbk"
         assert path == "/ha_discovery?prefix=custom_prefix"
 

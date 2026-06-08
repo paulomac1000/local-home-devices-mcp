@@ -12,8 +12,7 @@ pytestmark = [
     pytest.mark.smoke,
     pytest.mark.skipif(
         not server_is_running(),
-        reason=f"MCP server not running on port {REST_API_PORT}. "
-        f"Start with: python server.py",
+        reason=f"MCP server not running on port {REST_API_PORT}. Start with: python server.py",
     ),
 ]
 
@@ -85,9 +84,7 @@ class TestHealthEndpoint:
         """GET /health reports version == '1.6.0'."""
         resp = _api_get("/health")
         data = resp.json()
-        assert data.get("version") == "1.6.0", (
-            f"Expected version 1.6.0, got {data.get('version')}"
-        )
+        assert data.get("version") == "1.6.0", f"Expected version 1.6.0, got {data.get('version')}"
 
     def test_tools_list_returns_tools(self) -> None:
         """GET /api/tools returns a 'tools' list with >= 66 entries."""
@@ -105,9 +102,7 @@ class TestHealthEndpoint:
         data = resp.json()
         tool_names = {t["name"] for t in data.get("tools", []) if "name" in t}
         for name in SPECIFIC_CONFIG_TOOLS:
-            assert name in tool_names, (
-                f"'{name}' not found in /api/tools response"
-            )
+            assert name in tool_names, f"'{name}' not found in /api/tools response"
 
     def test_health_returns_tools_registered(self) -> None:
         """GET /health reports tools_registered matching tool_count."""
@@ -143,22 +138,16 @@ class TestToolDescriptions:
             elif not desc.strip():
                 empty.append(name)
         if missing:
-            raise AssertionError(
-                f"Config tools absent from /api/tools: {missing}"
-            )
+            raise AssertionError(f"Config tools absent from /api/tools: {missing}")
         if empty:
-            raise AssertionError(
-                f"Config tools with empty description: {empty}"
-            )
+            raise AssertionError(f"Config tools with empty description: {empty}")
 
     def test_all_tools_have_description(self) -> None:
         """Every tool in /api/tools has some description text."""
         resp = _api_get("/api/tools")
         data = resp.json()
         bad: list[tuple[str, str | None]] = [
-            (t["name"], t.get("description"))
-            for t in data["tools"]
-            if not t.get("description")
+            (t["name"], t.get("description")) for t in data["tools"] if not t.get("description")
         ]
         assert not bad, f"Tools with no description: {[b[0] for b in bad]}"
 
@@ -240,9 +229,7 @@ class TestDescribeCapabilities:
             )
         for t in tools:
             if t.get("name") in CONFIG_TOOL_NAMES:
-                assert "risk" in t, (
-                    f"Manifest for '{t['name']}' missing 'risk' field"
-                )
+                assert "risk" in t, f"Manifest for '{t['name']}' missing 'risk' field"
 
 
 # ===================================================================
