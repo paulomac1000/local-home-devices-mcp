@@ -53,6 +53,25 @@ MOCK_CACHE_DATA = {
     "devices": MOCK_DISCOVERED_DEVICES,
 }
 
+# Tasmota SetOption flags response (single option)
+MOCK_TASMOTA_SETOPTION_ON = {"SetOption0": "ON"}
+MOCK_TASMOTA_SETOPTION_OFF = {"SetOption0": "OFF"}
+
+# Tasmota DeviceName/FriendlyName response
+MOCK_TASMOTA_DEVICENAME = {"DeviceName": "Tasmota_Test"}
+MOCK_TASMOTA_FRIENDLYNAME = {"FriendlyName1": "Tasmota_Test"}
+
+# Tasmota MQTT config responses
+MOCK_TASMOTA_MQTTHOST = "192.0.2.100"
+
+# Backlog response (empty = success)
+MOCK_TASMOTA_BACKLOG_OK = {}
+
+# Timeout response
+MOCK_DEVICE_TIMEOUT_RESPONSE = {
+    "error": True, "response": "Connection timed out"
+}
+
 # --------------------------------------------------------------------------- #
 # OpenBK Status 0 response (anonymized real device data)
 # Source: BK7231N v1.17.306 device, IP/MAC/SSID/names anonymized

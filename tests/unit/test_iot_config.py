@@ -14,6 +14,7 @@ from tools.iot_config import (
     _execute_command,
     _get_full_info,
     _set_flags,
+    _set_friendly_name,
     _set_gpio,
     _set_name,
     _set_startup_command,
@@ -1013,6 +1014,84 @@ class TestSetStartupCommand:
 
 
 # ---------------------------------------------------------------------------
+# _set_friendly_name / iot_set_friendly_name
+# ---------------------------------------------------------------------------
+
+
+class TestFriendlyName:
+    """Tests for _set_friendly_name / iot_set_friendly_name — device friendly name."""
+
+    def test_set_friendly_name_tasmota_success(self):
+        """Set friendly name on Tasmota device — FriendlyName1 in URL."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_form.return_value = "OK"
+                    mock_session_cls.return_value = mock_session
+
+                    result = _set_friendly_name("192.168.1.100", "Bathroom_Mirror")
+                    data = json.loads(result)
+
+                    assert data["success"] is True
+                    assert data["data"]["friendly_name"] == "Bathroom_Mirror"
+                    assert data["data"]["device_type"] == "tasmota"
+                    assert data["data"]["ip"] == "192.168.1.100"
+                    call_url = mock_session.get_form.call_args[0][0]
+                    assert "FriendlyName1" in call_url
+                    assert "Bathroom_Mirror" in call_url
+
+    def test_set_friendly_name_openbk_unsupported(self):
+        """OpenBK does not support friendly name via HTTP — UNSUPPORTED_TYPE."""
+        from tools.http_session import DeviceConnectionError
+
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_form.side_effect = DeviceConnectionError(
+                        "[UNSUPPORTED_TYPE] set_friendly_name "
+                        "is not supported via HTTP GET on OpenBK"
+                    )
+                    mock_session_cls.return_value = mock_session
+
+                    result = _set_friendly_name("192.168.1.101", "Test")
+                    data = json.loads(result)
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "UNSUPPORTED_TYPE"
+
+    def test_set_friendly_name_invalid(self):
+        """Empty friendly_name — INVALID_PARAM error."""
+        result = _set_friendly_name("192.168.1.100", "")
+        data = json.loads(result)
+        assert data["success"] is False
+        assert data["error"]["code"] == "INVALID_PARAM"
+
+    def test_set_friendly_name_not_found(self):
+        """Unknown identifier — NAME_NOT_RESOLVED."""
+        with patch("tools.iot_config._resolve_or_fail", return_value=None):
+            result = _set_friendly_name("UnknownDevice", "Test")
+            data = json.loads(result)
+            assert data["success"] is False
+            assert data["error"]["code"] == "NAME_NOT_RESOLVED"
+
+    def test_set_friendly_name_wrapper_write_gate(self, mock_mcp, monkeypatch):
+        """iot_set_friendly_name returns WRITE_DISABLED when writes are off."""
+        monkeypatch.setattr("tools.constants.ENABLE_WRITE_OPERATIONS", False)
+        register_iot_config_tools(mock_mcp)
+        fn = mock_mcp.get_tool("iot_set_friendly_name")
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session_cls.return_value = mock_session
+                    result = fn("192.168.1.100", "Bathroom_Mirror")
+                    data = json.loads(result)
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "WRITE_DISABLED"
+
+
+# ---------------------------------------------------------------------------
 # _get_full_info / iot_get_full_info
 # ---------------------------------------------------------------------------
 
@@ -1682,6 +1761,190 @@ class TestValidationEdgeCases:
 # ---------------------------------------------------------------------------
 
 
+class TestConfigEdgeCases:
+    """Edge case and error path tests covering timeouts, HTTP errors,
+    non-JSON responses, overflow, special characters, and blocklist
+    boundary conditions.
+    """
+
+    # -----------------------------------------------------------------------
+    # Timeout / HTTP error / non-JSON
+    # -----------------------------------------------------------------------
+
+    def test_device_timeout_returns_timeout_error(self):
+        """get_json raises DeviceConnectionError('Connection timed out') — DEVICE_ERROR."""
+        from tools.http_session import DeviceConnectionError
+
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_json.side_effect = DeviceConnectionError(
+                        "Connection timed out"
+                    )
+                    mock_session_cls.return_value = mock_session
+
+                    result = _get_full_info("192.168.1.101")
+                    data = json.loads(result)
+
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "DEVICE_ERROR"
+                    assert "Connection timed out" in data["error"]["message"]
+
+    def test_device_http_500_returns_error(self):
+        """get_form raises DeviceConnectionError('HTTP 500: ...') — DEVICE_ERROR."""
+        from tools.http_session import DeviceConnectionError
+
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_form.side_effect = DeviceConnectionError(
+                        "HTTP 500: Internal Server Error"
+                    )
+                    mock_session_cls.return_value = mock_session
+
+                    result = _set_name("192.168.1.101", "Test")
+                    data = json.loads(result)
+
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "DEVICE_ERROR"
+                    assert "HTTP 500" in data["error"]["message"]
+
+    def test_device_returns_non_json(self):
+        """get_json raises DeviceConnectionError for a non-JSON response — DEVICE_ERROR."""
+        from tools.http_session import DeviceConnectionError
+
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_json.side_effect = DeviceConnectionError(
+                        "Failed to parse JSON: Expecting value: line 1 column 1 (char 0)"
+                    )
+                    mock_session_cls.return_value = mock_session
+
+                    result = _get_full_info("192.168.1.101")
+                    data = json.loads(result)
+
+                    assert data["success"] is False
+                    assert data["error"]["code"] == "DEVICE_ERROR"
+                    assert "JSON" in data["error"]["message"]
+
+    def test_empty_json_response(self):
+        """get_json returns {} — _get_full_info still succeeds with defaults."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_json.return_value = {}
+                    mock_session_cls.return_value = mock_session
+
+                    result = _get_full_info("192.168.1.101")
+                    data = json.loads(result)
+
+                    assert data["success"] is True
+                    assert data["data"]["version"] == "Unknown"
+                    assert data["data"]["mac"] == ""
+                    assert data["data"]["mqtt_host"] == ""
+                    assert data["data"]["wifi_ssid"] == ""
+                    assert data["data"]["wifi_rssi"] == ""
+                    assert data["data"]["wifi_signal"] == ""
+                    assert data["data"]["device_name"] == ""
+
+    # -----------------------------------------------------------------------
+    # Special characters / name validation
+    # -----------------------------------------------------------------------
+
+    def test_url_encoding_special_chars_in_name(self):
+        """Names with spaces and special chars rejected by validate_name_pattern."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            result = _set_name("192.168.1.101", "Bad Name!")
+            data = json.loads(result)
+            assert data["success"] is False
+            assert data["error"]["code"] == "INVALID_PARAM"
+            assert "invalid characters" in data["error"]["message"]
+
+    def test_set_name_valid_with_underscores(self):
+        """Underscores and digits are allowed in device names — success."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session_cls.return_value = mock_session
+
+                    result = _set_name("192.168.1.101", "Test_Device_123")
+                    data = json.loads(result)
+
+                    assert data["success"] is True
+                    assert data["data"]["short_name"] == "Test_Device_123"
+                    assert data["data"]["device_type"] == "openbk"
+
+    # -----------------------------------------------------------------------
+    # Flag bitfield overflow / negative
+    # -----------------------------------------------------------------------
+
+    def test_flag_bitfield_max_value(self):
+        """flags=2^64-1 (all 64 bits set) — OpenBK success with all flagN=1 params."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="openbk"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session_cls.return_value = mock_session
+
+                    max_flags = 2**64 - 1
+                    result = _set_flags("192.168.1.101", max_flags)
+                    data = json.loads(result)
+
+                    assert data["success"] is True
+                    assert data["data"]["flags_set"] == max_flags
+                    assert data["data"]["device_type"] == "openbk"
+                    assert data["data"]["ip"] == "192.168.1.101"
+
+                    # Verify all 64 flagN=1 parameters are in the URL
+                    call_path = mock_session.get_form.call_args[0][0]
+                    for bit in range(64):
+                        assert f"flag{bit}=1" in call_path
+
+    def test_flag_bitfield_negative_validation(self):
+        """flags=-1 — validate_flags_value rejects negative, INVALID_PARAM."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.101"):
+            result = _set_flags("192.168.1.101", -1)
+            data = json.loads(result)
+            assert data["success"] is False
+            assert data["error"]["code"] == "INVALID_PARAM"
+
+    # -----------------------------------------------------------------------
+    # Command blocklist boundary conditions
+    # -----------------------------------------------------------------------
+
+    def test_command_blocklist_not_backlog(self):
+        """'Power1 ON' is not in blocklist — succeeds."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+                with patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+                    mock_session = MagicMock()
+                    mock_session.get_form.return_value = '{"POWER":"ON"}'
+                    mock_session_cls.return_value = mock_session
+
+                    result = _execute_command("192.168.1.100", "Power1 ON")
+                    data = json.loads(result)
+
+                    assert data["success"] is True
+                    assert data["data"]["command"] == "Power1 ON"
+                    assert data["data"]["device_type"] == "tasmota"
+
+    def test_command_blocklist_backlog_with_format(self):
+        """'backlog format 1; Power1 ON' has destructive sub-command — COMMAND_BLOCKED."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"):
+            with patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+                result = _execute_command("192.168.1.100", "backlog format 1; Power1 ON")
+                data = json.loads(result)
+                assert data["success"] is False
+                assert data["error"]["code"] == "COMMAND_BLOCKED"
+                assert "destructive sub-commands" in data["error"]["message"]
+
+
 class TestInvalidParamFromBuildUrl:
     """Tests for [INVALID_PARAM] errors raised by _build_url."""
 
@@ -1702,3 +1965,254 @@ class TestInvalidParamFromBuildUrl:
                     data = json.loads(result)
                     assert data["success"] is False
                     assert data["error"]["code"] == "INVALID_PARAM"
+
+
+# ---------------------------------------------------------------------------
+# Tasmota config tool URL construction tests
+# ---------------------------------------------------------------------------
+
+
+class TestTasmotaConfigTools:
+    """Tests for Tasmota-specific config URL construction and behavior."""
+
+    def test_set_name_tasmota_backlog(self):
+        """Both names on Tasmota — backlog URL with DeviceName and FriendlyName1."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session_cls.return_value = mock_session
+
+            result = _set_name("192.168.1.100", "Short", full_name="Full_Name")
+            data = json.loads(result)
+
+            assert data["success"] is True
+            assert data["data"]["device_type"] == "tasmota"
+            assert data["data"]["short_name"] == "Short"
+            assert data["data"]["full_name"] == "Full_Name"
+
+            call_url = mock_session.get_form.call_args[0][0]
+            assert "backlog" in call_url
+            assert "DeviceName" in call_url
+            assert "FriendlyName1" in call_url
+
+    def test_set_name_tasmota_short_only(self):
+        """Only short_name on Tasmota — URL contains DeviceName but NOT FriendlyName1 or backlog."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session_cls.return_value = mock_session
+
+            result = _set_name("192.168.1.100", "Short")
+            data = json.loads(result)
+
+            assert data["success"] is True
+            call_url = mock_session.get_form.call_args[0][0]
+            assert "DeviceName" in call_url
+            assert "FriendlyName1" not in call_url
+            assert "backlog" not in call_url
+
+    def test_set_flags_tasmota_single_bit(self):
+        """Single bit 0 on Tasmota — URL has SetOption0 but NOT backlog."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.get_json.return_value = {}
+            mock_session_cls.return_value = mock_session
+
+            result = _set_flags("192.168.1.100", 1)
+            data = json.loads(result)
+
+            assert data["success"] is True
+            assert data["data"]["device_type"] == "tasmota"
+            call_url = mock_session.get_json.call_args[0][0]
+            assert "SetOption0" in call_url
+            assert "backlog" not in call_url
+
+    def test_set_flags_tasmota_multi_bit(self):
+        """Bits 0 and 3 on Tasmota — URL uses backlog with SetOption0 and SetOption3."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.get_json.return_value = {}
+            mock_session_cls.return_value = mock_session
+
+            result = _set_flags("192.168.1.100", 9)
+            data = json.loads(result)
+
+            assert data["success"] is True
+            call_url = mock_session.get_json.call_args[0][0]
+            assert "backlog" in call_url
+            assert "SetOption0" in call_url
+            assert "SetOption3" in call_url
+
+    def test_set_flags_tasmota_high_bit(self):
+        """Bit 31 on Tasmota — URL uses SetOption31, no backlog."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.get_json.return_value = {}
+            mock_session_cls.return_value = mock_session
+
+            result = _set_flags("192.168.1.100", 1 << 31)
+            data = json.loads(result)
+
+            assert data["success"] is True
+            call_url = mock_session.get_json.call_args[0][0]
+            assert "SetOption31" in call_url
+
+    def test_set_flags_tasmota_bit_32_error(self):
+        """Bit 32 outside Tasmota 32-bit range — no commands to send, INVALID_PARAM."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"):
+            result = _set_flags("192.168.1.100", 1 << 32)
+            data = json.loads(result)
+            assert data["success"] is False
+            assert data["error"]["code"] == "INVALID_PARAM"
+
+    def test_configure_mqtt_tasmota_single(self):
+        """Single MQTT host on Tasmota — URL contains MqttHost."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session_cls.return_value = mock_session
+
+            result = _configure_mqtt("192.168.1.100", host="192.168.1.1")
+            data = json.loads(result)
+
+            assert data["success"] is True
+            assert data["data"]["device_type"] == "tasmota"
+            assert data["data"]["host"] == "192.168.1.1"
+            call_url = mock_session.get_form.call_args[0][0]
+            assert "MqttHost" in call_url
+
+    def test_configure_mqtt_tasmota_multi(self):
+        """Multiple MQTT params — backlog URL with MqttHost, MqttPort, MqttClient."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session_cls.return_value = mock_session
+
+            result = _configure_mqtt(
+                "192.168.1.100",
+                host="192.168.1.1",
+                port=1884,
+                client="test_client",
+            )
+            data = json.loads(result)
+
+            assert data["success"] is True
+            call_url = mock_session.get_form.call_args[0][0]
+            assert "backlog" in call_url
+            assert "MqttHost" in call_url
+            assert "MqttPort" in call_url
+            assert "MqttClient" in call_url
+
+    def test_start_ha_discovery_tasmota(self):
+        """HA discovery on Tasmota — URL contains SetOption19."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session_cls.return_value = mock_session
+
+            result = _start_ha_discovery("192.168.1.100")
+            data = json.loads(result)
+
+            assert data["success"] is True
+            assert data["data"]["device_type"] == "tasmota"
+            call_url = mock_session.get_form.call_args[0][0]
+            assert "SetOption19" in call_url
+
+    def test_set_startup_command_tasmota(self):
+        """Startup command on Tasmota — URL contains Rule1 and System#Boot."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session_cls.return_value = mock_session
+
+            result = _set_startup_command("192.168.1.100", "Power1 ON")
+            data = json.loads(result)
+
+            assert data["success"] is True
+            assert data["data"]["device_type"] == "tasmota"
+            call_url = mock_session.get_form.call_args[0][0]
+            assert "Rule1" in call_url
+            assert "System" in call_url
+
+    def test_set_friendly_name_tasmota(self):
+        """Set friendly name on Tasmota — URL contains FriendlyName1."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session_cls.return_value = mock_session
+
+            result = _set_friendly_name("192.168.1.100", "Test_Name")
+            data = json.loads(result)
+
+            assert data["success"] is True
+            assert data["data"]["device_type"] == "tasmota"
+            assert data["data"]["friendly_name"] == "Test_Name"
+            call_url = mock_session.get_form.call_args[0][0]
+            assert "FriendlyName1" in call_url
+
+    def test_get_full_info_tasmota(self):
+        """Tasmota Status 0 JSON parsed — version, mac, device_type from fixture."""
+        from tests.mock_data.mock_responses import tasmota_status0_response
+
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.get_json.return_value = tasmota_status0_response()
+            mock_session_cls.return_value = mock_session
+
+            result = _get_full_info("192.168.1.100")
+            data = json.loads(result)
+
+            assert data["success"] is True
+            assert data["data"]["device_type"] == "tasmota"
+            assert data["data"]["version"] == "12.5.0(tasmota)"
+            assert data["data"]["mac"] == "AA:BB:CC:DD:EE:22"
+            assert data["data"]["wifi_ssid"] == "PabloSPOT"
+
+    def test_get_full_info_tasmota_name_not_resolved(self):
+        """Unresolvable identifier — NAME_NOT_RESOLVED."""
+        with patch("tools.iot_config._resolve_or_fail", return_value=None):
+            result = _get_full_info("UnknownDevice")
+            data = json.loads(result)
+            assert data["success"] is False
+            assert data["error"]["code"] == "NAME_NOT_RESOLVED"
+
+    def test_tasmota_device_not_found(self):
+        """No IoT device detected — DEVICE_NOT_FOUND."""
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value=None):
+            result = _set_name("192.168.1.100", "Test")
+            data = json.loads(result)
+            assert data["success"] is False
+            assert data["error"]["code"] == "DEVICE_NOT_FOUND"
+
+    def test_tasmota_connection_error(self):
+        """DeviceConnectionError during HTTP call — DEVICE_ERROR."""
+        from tools.http_session import DeviceConnectionError
+
+        with patch("tools.iot_config._resolve_or_fail", return_value="192.168.1.100"), \
+             patch("tools.iot_discovery._detect_device_type", return_value="tasmota"), \
+             patch("tools.iot_config._DeviceHttpSession") as mock_session_cls:
+            mock_session = MagicMock()
+            mock_session.get_form.side_effect = DeviceConnectionError("Connection refused")
+            mock_session_cls.return_value = mock_session
+
+            result = _set_name("192.168.1.100", "Test")
+            data = json.loads(result)
+            assert data["success"] is False
+            assert data["error"]["code"] == "DEVICE_ERROR"

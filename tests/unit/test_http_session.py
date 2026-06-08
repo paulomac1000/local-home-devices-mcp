@@ -1,5 +1,6 @@
 """Unit tests for tools/http_session.py -- Generic IoT device HTTP client."""
 
+import urllib.parse
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -568,3 +569,103 @@ class TestBuildUrlUnsupported:
         """Tasmota with nonexistent endpoint raises UNSUPPORTED_TYPE."""
         with pytest.raises(DeviceConnectionError, match="UNSUPPORTED_TYPE"):
             _build_url("tasmota", "nonexistent_endpoint")
+
+
+# =============================================================================
+# I. _build_url -- Tasmota V2 endpoints (v1.6.0+)
+# =============================================================================
+
+
+class TestBuildUrlTasmotaV2:
+    """Tests for new Tasmota URL builders added in v1.6.0."""
+
+    def test_set_flags_single_bit(self):
+        """tasmota set_flags with single bit returns single SetOption command."""
+        url, dt = _build_url("tasmota", "set_flags", flags=1)  # bit 0
+        assert urllib.parse.quote("SetOption0 1") in url
+        assert dt == "tasmota"
+
+    def test_set_flags_multi_bit(self):
+        """tasmota set_flags with multiple bits returns backlog command."""
+        url, dt = _build_url("tasmota", "set_flags", flags=9)  # bits 0, 3
+        assert "backlog" in url
+        assert "SetOption0" in url
+        assert "SetOption3" in url
+        assert dt == "tasmota"
+
+    def test_set_flags_zero_bits_raises(self):
+        """tasmota set_flags with flags=0 raises INVALID_PARAM."""
+        with pytest.raises(DeviceConnectionError, match="INVALID_PARAM"):
+            _build_url("tasmota", "set_flags", flags=0)
+
+    def test_set_name_short_only(self):
+        """tasmota set_name with only short_name returns DeviceName URL."""
+        url, dt = _build_url("tasmota", "set_name", short_name="Test")
+        assert "DeviceName" in url
+        assert "Test" in url
+        assert dt == "tasmota"
+
+    def test_set_name_with_full_name(self):
+        """tasmota set_name with full_name returns backlog with FriendlyName1."""
+        url, dt = _build_url("tasmota", "set_name", short_name="Short", full_name="Full_Name")
+        assert "backlog" in url
+        assert "DeviceName" in url
+        assert "FriendlyName1" in url
+        assert "Short" in url
+        assert "Full_Name" in url
+
+    def test_set_name_with_name_fallback(self):
+        """When full_name not provided but 'name' param is, use 'name' as full_name."""
+        url, dt = _build_url("tasmota", "set_name", short_name="S", name="N")
+        assert "DeviceName" in url
+        assert "FriendlyName1" in url
+        assert dt == "tasmota"
+
+    def test_configure_mqtt_single_param(self):
+        """tasmota configure_mqtt with single param returns single command URL."""
+        url, dt = _build_url("tasmota", "configure_mqtt", host="192.168.1.1")
+        assert "MqttHost" in url
+        assert "192.168.1.1" in url
+        assert "backlog" not in url
+        assert dt == "tasmota"
+
+    def test_configure_mqtt_multi_param(self):
+        """tasmota configure_mqtt with multiple params returns backlog URL."""
+        url, dt = _build_url(
+            "tasmota", "configure_mqtt", host="192.168.1.1", port=1883, client="test"
+        )
+        assert "backlog" in url
+        assert "MqttHost" in url
+        assert "MqttPort" in url
+        assert "MqttClient" in url
+
+    def test_configure_mqtt_no_params_raises(self):
+        """tasmota configure_mqtt with no params raises INVALID_PARAM."""
+        with pytest.raises(DeviceConnectionError, match="INVALID_PARAM"):
+            _build_url("tasmota", "configure_mqtt")
+
+    def test_set_startup_command(self):
+        """tasmota set_startup_command returns Rule1 with System#Boot trigger."""
+        url, dt = _build_url("tasmota", "set_startup_command", command="Power1 ON")
+        assert "Rule1" in url
+        assert "System%23Boot" in url  # # is URL-encoded
+        assert "Power1%20ON" in url
+        assert dt == "tasmota"
+
+    def test_set_friendly_name(self):
+        """tasmota set_friendly_name returns FriendlyName1 URL."""
+        url, dt = _build_url("tasmota", "set_friendly_name", friendly_name="Bathroom_Light")
+        assert "FriendlyName1" in url
+        assert "Bathroom_Light" in url
+        assert dt == "tasmota"
+
+    def test_start_ha_discovery(self):
+        """tasmota start_ha_discovery returns SetOption19 URL."""
+        url, dt = _build_url("tasmota", "start_ha_discovery")
+        assert "SetOption19" in url
+        assert dt == "tasmota"
+
+    def test_set_gpio_unsupported(self):
+        """tasmota set_gpio raises UNSUPPORTED_TYPE."""
+        with pytest.raises(DeviceConnectionError, match="UNSUPPORTED_TYPE"):
+            _build_url("tasmota", "set_gpio", pin=6, role="Relay")

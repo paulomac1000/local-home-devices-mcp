@@ -321,7 +321,7 @@ def _build_tasmota_url(endpoint_name: str, **params: Any) -> tuple[str, str]:
 
     if endpoint_name == "set_name":
         short = str(params.get("short_name", ""))
-        full = str(params.get("full_name", ""))
+        full = str(params.get("full_name", params.get("name", "")))
         if full:
             cmd = f"DeviceName {full}; FriendlyName1 {short}"
             return (f"/cm?cmnd=backlog%20{urllib.parse.quote(cmd)}", "tasmota")
