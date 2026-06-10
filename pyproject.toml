@@ -9,7 +9,7 @@ description = "MCP server for local home device management: Tasmota, OpenBK, Tuy
 requires-python = ">=3.11"
 dependencies = [
     "defusedxml>=0.7.1",
-    "fastmcp>=2.0.0,<3.0.0",
+    "fastmcp>=2.0.0,<4.0.0",
     "requests>=2.28.0",
     "starlette>=0.27.0",
     "uvicorn>=0.22.0",
