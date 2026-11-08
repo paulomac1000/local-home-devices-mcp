@@ -400,9 +400,7 @@ class TestDiscoveryToolImpls:
         assert data["data"]["devices"][0]["current_reachability"] == "UNKNOWN"
         assert "reachable" not in data["data"]["devices"][0]
 
-    def test_stale_discovery_reports_historical_not_live_reachability(
-        self, tmp_path, monkeypatch
-    ):
+    def test_stale_discovery_reports_historical_not_live_reachability(self, tmp_path, monkeypatch):
         """Months-old reachable/RSSI values must never impersonate live probes."""
         old_time = "2026-07-27T21:43:45Z"
         fake_cache = tmp_path / "discovered_devices.json"
@@ -488,9 +486,7 @@ class TestDiscoveryToolImpls:
     def test_find_by_name_preserves_historical_provenance(self, tmp_path, monkeypatch):
         fake_cache = tmp_path / "discovered_devices.json"
         monkeypatch.setattr("tools.iot_discovery.CACHE_FILE", str(fake_cache))
-        _save_cache(
-            [{"ip": "192.168.1.100", "name": "Light_Bathroom", "reachable": True}]
-        )
+        _save_cache([{"ip": "192.168.1.100", "name": "Light_Bathroom", "reachable": True}])
         with patch("tools.iot_discovery.requests.get") as network:
             found = json.loads(_iot_find_device_by_name("Bathroom"))["data"]
         network.assert_not_called()
