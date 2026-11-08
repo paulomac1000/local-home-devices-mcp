@@ -129,6 +129,32 @@ def _is_cache_fresh() -> bool:
         return False
 
 
+def _project_cached_observation(
+    device: dict[str, Any], last_scan: str | None
+) -> dict[str, Any]:
+    """Separate historical discovery observations from current reachability.
+
+    This helper performs no device I/O; even an hour-old discovery result
+    cannot prove that a device remains online right now.
+    """
+    result = dict(device)
+    old_reachable = result.pop("reachable", None)
+    old_rssi = result.pop("rssi", None)
+    result.update(
+        {
+            "last_known_reachable": (
+                old_reachable if isinstance(old_reachable, bool) else None
+            ),
+            "last_known_rssi": old_rssi,
+            "last_discovery_scan_at": last_scan,
+            "current_reachability": "UNKNOWN",
+            "current_probe_at": None,
+            "observation_source": "discovery_cache",
+        }
+    )
+    return result
+
+
 def _find_device_by_identifier(identifier: str) -> dict[str, Any] | None:
     """Find a device by IP address or name (case-insensitive).
 
@@ -560,7 +586,7 @@ def _iot_discover_devices(network_range: str | None = None, timeout_seconds: int
 
 
 def _iot_list_devices() -> str:
-    """List all discovered IoT devices from the local cache.
+    """List historic discovery observations; never claim current reachability.
 
     Returns:
         JSON string with cached devices or suggestion to run discovery.
@@ -583,13 +609,22 @@ def _iot_list_devices() -> str:
 
         summary = [
             {
-                "ip": d.get("ip"),
-                "name": d.get("name", "Unknown"),
-                "type": d.get("type"),
-                "rssi": d.get("rssi"),
-                "reachable": d.get("reachable", False),
+                key: observation.get(key)
+                for key in (
+                    "ip",
+                    "name",
+                    "type",
+                    "last_known_rssi",
+                    "last_known_reachable",
+                    "last_discovery_scan_at",
+                    "current_reachability",
+                    "current_probe_at",
+                    "observation_source",
+                )
             }
             for d in devices
+            if isinstance(d, dict)
+            for observation in [_project_cached_observation(d, cache.get("last_scan"))]
         ]
 
         return _success_response(
@@ -638,7 +673,7 @@ def _iot_check_device(ip_address: str, timeout_seconds: int = 10) -> str:
 
 
 def _iot_find_device_by_name(name: str) -> str:
-    """Find a device in the cache by its friendly name (partial match supported).
+    """Find cached identity by friendly name; reachability remains unverified.
 
     Args:
         name: Device name or part of it (case-insensitive).
@@ -659,7 +694,13 @@ def _iot_find_device_by_name(name: str) -> str:
                 ),
             )
 
-        return _success_response({"device": device})
+        cache = _load_cache()
+        return _success_response(
+            {
+                "device": _project_cached_observation(device, cache.get("last_scan")),
+                "cache_fresh": _is_cache_fresh(),
+            }
+        )
 
     except Exception as exc:
         return _error_response_extended(code="INTERNAL_ERROR", message=str(exc))
