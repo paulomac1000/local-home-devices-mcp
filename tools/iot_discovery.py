@@ -129,9 +129,7 @@ def _is_cache_fresh() -> bool:
         return False
 
 
-def _project_cached_observation(
-    device: dict[str, Any], last_scan: str | None
-) -> dict[str, Any]:
+def _project_cached_observation(device: dict[str, Any], last_scan: str | None) -> dict[str, Any]:
     """Separate historical discovery observations from current reachability.
 
     This helper performs no device I/O; even an hour-old discovery result
@@ -142,9 +140,7 @@ def _project_cached_observation(
     old_rssi = result.pop("rssi", None)
     result.update(
         {
-            "last_known_reachable": (
-                old_reachable if isinstance(old_reachable, bool) else None
-            ),
+            "last_known_reachable": (old_reachable if isinstance(old_reachable, bool) else None),
             "last_known_rssi": old_rssi,
             "last_discovery_scan_at": last_scan,
             "current_reachability": "UNKNOWN",
