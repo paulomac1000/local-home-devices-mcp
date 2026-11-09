@@ -269,7 +269,6 @@ class TestGetDeviceInfo:
         assert data["error"]["code"] == "READ_PROBE_TIMEOUT"
         assert "mutation" not in data["error"]["message"].lower()
 
-
     def test_get_device_info_by_ip(self):
         """Should resolve IP directly and return info."""
         with (
