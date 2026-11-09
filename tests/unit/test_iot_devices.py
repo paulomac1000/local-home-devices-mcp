@@ -6,6 +6,7 @@ import json
 from unittest.mock import MagicMock, patch
 
 import pytest
+import requests
 
 from tools.iot_devices import (
     _get_device_info,
@@ -68,6 +69,15 @@ class TestGetOpenBKStatus:
         ):
             status = _get_openbk_status("192.168.1.101")
             assert "error" in status
+
+    def test_get_openbk_status_timeout_is_read_probe_error(self):
+        with patch(
+            "tools.iot_devices.requests.get",
+            side_effect=requests.exceptions.Timeout("synthetic timeout"),
+        ):
+            status = _get_openbk_status("192.0.2.10")
+        assert status["error_code"] == "READ_PROBE_TIMEOUT"
+        assert "mutation" not in status["error"].lower()
 
     def test_get_openbk_status_uptime(self):
         """Should extract uptime from data-initial attribute."""
@@ -229,6 +239,35 @@ class TestGetTasmotaStatus:
 
 class TestGetDeviceInfo:
     """Tests for device info tool."""
+
+    def test_invalid_timeout_prevents_target_resolution_and_network(self):
+        with (
+            patch("tools.iot_discovery._resolve_ip") as resolver,
+            patch("tools.iot_devices.requests.get") as network,
+        ):
+            for timeout in (0, 11, True, 1.5, "10"):
+                data = json.loads(_get_device_info("SyntheticDevice", timeout))
+                assert data["success"] is False
+                assert data["error"]["code"] == "INVALID_PARAM"
+            resolver.assert_not_called()
+            network.assert_not_called()
+
+    def test_read_only_openbk_timeout_has_typed_nonmutation_outcome(self):
+        with (
+            patch("tools.iot_discovery._resolve_ip", return_value="192.0.2.10"),
+            patch("tools.iot_discovery._detect_device_type", return_value="openbk"),
+            patch(
+                "tools.iot_devices._get_openbk_status",
+                return_value={
+                    "error": "OpenBK read-only status probe timed out",
+                    "error_code": "READ_PROBE_TIMEOUT",
+                },
+            ),
+        ):
+            data = json.loads(_get_device_info("SyntheticDevice"))
+        assert data["success"] is False
+        assert data["error"]["code"] == "READ_PROBE_TIMEOUT"
+        assert "mutation" not in data["error"]["message"].lower()
 
     def test_get_device_info_by_ip(self):
         """Should resolve IP directly and return info."""

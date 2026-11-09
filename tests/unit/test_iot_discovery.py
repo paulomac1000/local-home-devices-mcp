@@ -397,6 +397,73 @@ class TestDiscoveryToolImpls:
         assert data["data"]["device_count"] == 1
         assert data["data"]["cached"] is True
         assert "cache_fresh" in data["data"]
+        assert data["data"]["devices"][0]["current_reachability"] == "UNKNOWN"
+        assert "reachable" not in data["data"]["devices"][0]
+
+    def test_stale_discovery_reports_historical_not_live_reachability(self, tmp_path, monkeypatch):
+        """Months-old reachable/RSSI values must never impersonate live probes."""
+        old_time = "2026-07-27T21:43:45Z"
+        fake_cache = tmp_path / "discovered_devices.json"
+        monkeypatch.setattr("tools.iot_discovery.CACHE_FILE", str(fake_cache))
+        fake_cache.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "last_scan": old_time,
+                    "devices": [
+                        {
+                            "ip": "192.168.1.100",
+                            "name": "offline-openbk",
+                            "type": "openbk",
+                            "reachable": True,
+                            "rssi": -84,
+                        }
+                    ],
+                }
+            ),
+            encoding="utf-8",
+        )
+        with patch("tools.iot_discovery.requests.get") as network:
+            result = json.loads(_iot_list_devices())["data"]
+        network.assert_not_called()
+        row = result["devices"][0]
+        assert result["cache_fresh"] is False
+        assert result["last_scan"] == old_time
+        assert row["last_discovery_scan_at"] == old_time
+        assert row["cache_freshness"] == "STALE"
+        assert row["cache_age_seconds"] >= 3600
+        assert row["last_known_reachable"] is True
+        assert row["last_known_rssi"] == -84
+        assert row["current_reachability"] == "UNKNOWN"
+        assert row["current_probe_at"] is None
+        assert row["observation_source"] == "discovery_cache"
+        assert "reachable" not in row
+        assert "rssi" not in row
+
+    def test_future_cache_timestamp_never_reports_fresh_or_reachable(self, tmp_path, monkeypatch):
+        fake_cache = tmp_path / "discovered_devices.json"
+        monkeypatch.setattr("tools.iot_discovery.CACHE_FILE", str(fake_cache))
+        future_time = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(time.time() + 7200))
+        fake_cache.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "last_scan": future_time,
+                    "devices": [{"ip": "192.0.2.10", "name": "future-test", "reachable": True}],
+                }
+            ),
+            encoding="utf-8",
+        )
+        with patch("tools.iot_discovery.requests.get") as network:
+            result = json.loads(_iot_list_devices())["data"]
+        network.assert_not_called()
+        assert _is_cache_fresh() is False
+        assert result["cache_fresh"] is False
+        row = result["devices"][0]
+        assert row["cache_freshness"] == "UNKNOWN"
+        assert row["cache_age_seconds"] is None
+        assert row["current_reachability"] == "UNKNOWN"
+        assert row["last_known_reachable"] is True
 
     def test_iot_check_device_found(self):
         with (
@@ -440,6 +507,20 @@ class TestDiscoveryToolImpls:
         data = json.loads(result)
         assert data["success"] is True
         assert data["data"]["device"]["ip"] == "192.168.1.100"
+        assert data["data"]["device"]["current_reachability"] == "UNKNOWN"
+        assert "reachable" not in data["data"]["device"]
+
+    def test_find_by_name_preserves_historical_provenance(self, tmp_path, monkeypatch):
+        fake_cache = tmp_path / "discovered_devices.json"
+        monkeypatch.setattr("tools.iot_discovery.CACHE_FILE", str(fake_cache))
+        _save_cache([{"ip": "192.168.1.100", "name": "Light_Bathroom", "reachable": True}])
+        with patch("tools.iot_discovery.requests.get") as network:
+            found = json.loads(_iot_find_device_by_name("Bathroom"))["data"]
+        network.assert_not_called()
+        assert found["device"]["last_known_reachable"] is True
+        assert found["device"]["current_reachability"] == "UNKNOWN"
+        assert found["device"]["current_probe_at"] is None
+        assert "reachable" not in found["device"]
 
     def test_iot_find_device_by_name_not_found(self, tmp_path, monkeypatch):
         fake_cache = tmp_path / "discovered_devices.json"

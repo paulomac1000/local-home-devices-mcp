@@ -116,6 +116,11 @@ def _get_openbk_status(ip: str, timeout: int = 5) -> dict[str, Any]:
             pass
 
         return status
+    except requests.exceptions.Timeout:
+        return {
+            "error": "OpenBK read-only status probe timed out",
+            "error_code": "READ_PROBE_TIMEOUT",
+        }
     except Exception as exc:
         return {"error": str(exc)}
 
@@ -171,6 +176,11 @@ def _get_tasmota_status(ip: str, timeout: int = 5) -> dict[str, Any]:
             "save_data": status.get("SaveData", 0),
             "power_on_state": status.get("PowerOnState", 0),
         }
+    except requests.exceptions.Timeout:
+        return {
+            "error": "Tasmota read-only status probe timed out",
+            "error_code": "READ_PROBE_TIMEOUT",
+        }
     except Exception as exc:
         return {"error": str(exc)}
 
@@ -194,6 +204,17 @@ def _get_device_info(identifier: str, timeout_seconds: int = 10) -> str:
         identifier = validate_required_string(identifier, "identifier")
     except ValidationError as exc:
         return _error_response_extended(code="INVALID_PARAM", message=str(exc))
+
+    # Validate the read-only probe budget before any DNS, cache, or device I/O.
+    if (
+        isinstance(timeout_seconds, bool)
+        or not isinstance(timeout_seconds, int)
+        or not 1 <= timeout_seconds <= 10
+    ):
+        return _error_response_extended(
+            code="INVALID_PARAM",
+            message="timeout_seconds must be an integer between 1 and 10",
+        )
 
     ip_address = _resolve_ip(identifier)
 
@@ -270,7 +291,11 @@ def _get_device_info(identifier: str, timeout_seconds: int = 10) -> str:
         )
 
     if "error" in info:
-        return _error_response_extended(code="INTERNAL_ERROR", message=info["error"])
+        # A failed GET is never a possibly completed device mutation.
+        return _error_response_extended(
+            code=info.get("error_code", "INTERNAL_ERROR"),
+            message=info["error"],
+        )
 
     return _success_response(
         {
